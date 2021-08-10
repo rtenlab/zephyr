@@ -28,6 +28,96 @@ Intel x86, ARC, Nios II, Tensilica Xtensa, and RISC-V, and a large number of
 .. below included in doc/introduction/introduction.rst
 
 
+Notes on Adafruit Feather nRF52840 Sense
+****************************************
+
+The information below introduces how to use the Adafruit's default bootloader to 
+download a Zephyr image to the board. This is convenient as it does not require 
+an external J-Link programmer and the Adafruit Feather nRF52840 Sense board does not 
+have a built-in socket to connect the J-Link programmer. 
+
+You need to follow the Adafruit's instruction to setup the Arduino environment first:
+https://learn.adafruit.com/adafruit-feather-sense
+`adafruit-nrfutil` will be installed as part of this procedure. 
+
+Then follow the Getting Started Guide of Zephyr (https://docs.zephyrproject.org/latest/) and replace ``~/zephyrproject/zephyr`` with this repository.
+
+Compile and run Blinky
+----------------------
+
+* Compile:
+
+    west build -b adafruit_feather_nrf52840_sense samples/basic/blinky
+   
+* Download:
+  
+  Enter the DFU mode by double-clicking the *Reset button* of the Sense board. When ready, a large Green LED will turn on and the Sense device will be detected as a USB Mass storage (FTHRSNSBOOT) on your host machine. Then,
+  
+    adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x00B6 --application build/zephyr/zephyr.hex build/zephyr/zephyr.zip
+      
+    adafruit-nrfutil --verbose dfu serial -pkg build/zephyr/zephyr.zip -p /dev/ttyACM0 -b 115200 --singlebank 
+
+  ``/dev/ttyACM0`` is the serial port for the Sense board. 
+  
+  If this fails, try updating the bootloader: https://learn.adafruit.com/bluefruit-nrf52-feather-learning-guide/updating-the-bootloader
+
+
+* Change kernel configuration (similar to Linux kernel menuconfig; don't use if not needed): 
+
+    west build -t menuconfig
+   
+
+Other programs 
+----------------------
+
+You may need to delete the ``build`` folder before compiling another application.
+
+* Button
+
+  Turns on the RED led while the User SW button is being pressed. No printk output is visible from this program.
+
+    west build -b adafruit_feather_nrf52840_sense samples/basic/blinky
+    
+    adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x00B6 --application build/zephyr/zephyr.hex build/zephyr/zephyr.zip
+      
+    adafruit-nrfutil --verbose dfu serial -pkg build/zephyr/zephyr.zip -p /dev/ttyACM0 -b 115200 --singlebank 
+
+
+* USB Console
+
+    west build -b adafruit_feather_nrf52840_sense samples/subsys/usb/console/
+    
+    adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x00B6 --application build/zephyr/zephyr.hex build/zephyr/zephyr.zip
+      
+    adafruit-nrfutil --verbose dfu serial -pkg build/zephyr/zephyr.zip -p /dev/ttyACM0 -b 115200 --singlebank 
+
+  This program enables USB-Serial, so you can check printk output on your host computer. Use the Arduino IDE's serial monitor or `sudo minicom` in a terminal.
+  
+  Refer to the source code (``samples/subsys/usb/console/src/main.c``) and the project config (``samples/subsys/usb/console/prj.conf``) of this sample to enable printk in your program.
+
+
+* BLE Beacon
+
+    west build -b adafruit_feather_nrf52840_sense samples/bluetooth/beacon/
+    
+    adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x00B6 --application build/zephyr/zephyr.hex build/zephyr/zephyr.zip
+      
+    adafruit-nrfutil --verbose dfu serial -pkg build/zephyr/zephyr.zip -p /dev/ttyACM0 -b 115200 --singlebank 
+
+  See the Adafruit's beacon for testing.
+
+
+* BLE Beacon + LED + UART
+
+    west build -b adafruit_feather_nrf52840_sense samples/bluetooth/beacon_led_uart/
+    
+    adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x00B6 --application build/zephyr/zephyr.hex build/zephyr/zephyr.zip
+      
+    adafruit-nrfutil --verbose dfu serial -pkg build/zephyr/zephyr.zip -p /dev/ttyACM0 -b 115200 --singlebank 
+    
+  A naive integration of the three sample programs. The program blinks and prints every second when the serial monitor is on; otherwise, the device goes to sleep mode and LED blinks very slowly.  
+
+
 Getting Started
 ***************
 
