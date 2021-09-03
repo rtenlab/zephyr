@@ -10,6 +10,10 @@
 #include <device.h>
 #include <stdio.h>
 #include <sys/printk.h>
+#include <sys/util.h>
+#include <usb/usb_device.h>
+#include <drivers/uart.h>
+#include <drivers/gpio.h>
 
 #ifdef CONFIG_APDS9960_TRIGGER
 K_SEM_DEFINE(sem, 0, 1);
@@ -26,8 +30,17 @@ static void trigger_handler(const struct device *dev,
 
 void main(void)
 {
-	const struct device *dev;
+	const struct device *dev, *dev_usb;
 	struct sensor_value intensity, pdata;
+	dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+	uint32_t dtr=0;
+
+	if(usb_enable(NULL))
+		return;
+	
+	while(!dtr)
+		uart_line_ctrl_get(dev_usb,UART_LINE_CTRL_DTR, &dtr);
+	
 
 	printk("APDS9960 sample application\n");
 	dev = device_get_binding(DT_LABEL(DT_INST(0, avago_apds9960)));
@@ -35,6 +48,7 @@ void main(void)
 		printk("sensor: device not found.\n");
 		return;
 	}
+	printk("%p\n",dev->data);
 
 #ifdef CONFIG_APDS9960_TRIGGER
 	struct sensor_value attr = {
@@ -74,7 +88,7 @@ void main(void)
 		sensor_channel_get(dev, SENSOR_CHAN_PROX, &pdata);
 
 		printk("ambient light intensity %d, proximity %d\n",
-		       intensity.val1, pdata.val1);
+		       intensity.val2, pdata.val2);
 
 #ifdef CONFIG_PM_DEVICE
 		enum pm_device_state p_state;

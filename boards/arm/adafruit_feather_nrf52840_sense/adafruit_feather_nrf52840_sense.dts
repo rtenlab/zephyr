@@ -80,7 +80,13 @@
 	compatible = "nordic,nrf-twi";
 	status = "okay";
 	sda-pin = <12>;
-	scl-pin = <11>;
+	scl-pin = <11>;	
+	apds9960@39{
+		compatible = "avago,apds9960";
+		reg = <0x39>;
+		label = "APDS9960";
+		int-gpios= <&gpio0 12  (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+	};
 };
 
 &spi1 {

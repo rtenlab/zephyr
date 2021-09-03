@@ -12,6 +12,14 @@
 #include <zephyr.h>
 #include <sys/printk.h>
 
+
+//changes made by dev start
+#include<string.h>
+#include<sys/util.h>
+#include<usb/usb_device.h>
+#include<drivers/uart.h>
+
+
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/conn.h>
@@ -62,9 +70,15 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 static void start_scan(void)
 {
 	int err;
-
+	char addr_s[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_t addr = {0};
+	size_t count=1;
 	/* This demo doesn't require active scan */
 	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, device_found);
+	bt_id_get(&addr,&count);
+	bt_addr_le_to_str(&addr,addr_s, sizeof(addr_s));
+	printk("Central started, adversting as %s\n",addr_s);
+
 	if (err) {
 		printk("Scanning failed to start (err %d)\n", err);
 		return;
@@ -136,4 +150,19 @@ void main(void)
 	bt_conn_cb_register(&conn_callbacks);
 
 	start_scan();
+	const struct device *dev = device_get_binding(
+                        CONFIG_UART_CONSOLE_ON_DEV_NAME);
+        uint32_t dtr = 0;
+
+        if (usb_enable(NULL)) {
+                return;
+        }
+if (strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME) !=
+            strlen("CDC_ACM_0") ||
+            strncmp(CONFIG_UART_CONSOLE_ON_DEV_NAME, "CDC_ACM_0",
+                    strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME))) {
+                printk("Error: Console device name is not USB ACM\n");
+
+                return;
+        }
 }

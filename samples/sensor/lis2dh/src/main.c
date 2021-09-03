@@ -44,6 +44,7 @@ static void fetch_and_display(const struct device *sensor)
 static void trigger_handler(const struct device *dev,
 			    struct sensor_trigger *trig)
 {
+	locha
 	fetch_and_display(dev);
 }
 #endif

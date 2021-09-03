@@ -10,6 +10,19 @@
 #include <stdio.h>
 #include <sys/util.h>
 
+/*
+#include <zephyr/types.h>
+#include <stddef.h>
+#include <string.h>
+#include <sys/printk.h>
+#include <usb/usb_device.h>
+#include <drivers/uart.h>
+
+#include <device.h>
+#include <devicetree.h>
+#include <drivers/gpio.h>
+*/
+
 static inline float out_ev(struct sensor_value *val)
 {
 	return (val->val1 + (float)val->val2 / 1000000);
@@ -97,6 +110,24 @@ static void lsm6dsl_trigger_handler(const struct device *dev,
 
 void main(void)
 {
+	/*
+	const struct device *dev_usb;
+
+  dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+        uint32_t dtr = 0;
+
+        if (usb_enable(NULL)) {
+                return;
+        }
+
+        while (!dtr) {
+                uart_line_ctrl_get(dev_usb, UART_LINE_CTRL_DTR, &dtr);
+        }
+
+        printk("Changes made by Dev Joshi\n");
+	*/
+	
+
 	int cnt = 0;
 	char out_str[64];
 	struct sensor_value odr_attr;
