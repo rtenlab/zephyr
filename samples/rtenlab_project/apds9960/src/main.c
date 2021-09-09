@@ -50,7 +50,6 @@ const struct device *dev_apds9960;						// Device struct to get device binding f
 */
 void read_proximity_data(){
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_PDATA,&data_proximity);
-
 	return;
 }
 
@@ -61,7 +60,7 @@ void read_als_data(){
 	// Read the clear channel!
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_CDATAL,&data_L);
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_CDATAH,&data_H);
-	printk("CDATAL: %d\t CDATAH: %d\n",data_L,data_H);
+	//printk("CDATAL: %d\t CDATAH: %d\n",data_L,data_H);
 	data_c = data_H;
 	data_c = (data_c<<8);
 	data_c |=  data_L;
@@ -69,7 +68,7 @@ void read_als_data(){
 	// Read the red channel!
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_RDATAL,&data_L);
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_RDATAH,&data_H);
-	printk("RDATAL: %d\t RDATAH: %d\n",data_L,data_H);
+	//printk("RDATAL: %d\t RDATAH: %d\n",data_L,data_H);
 	data_r = data_H;
 	data_r = (data_r<<8);
 	data_r |=  data_L;
@@ -77,7 +76,7 @@ void read_als_data(){
 	// Read the Green Channel!
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_GDATAL,&data_L);
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_GDATAH,&data_H);
-	printk("GDATAL: %d\t GDATAH: %d\n",data_L,data_H);
+	//printk("GDATAL: %d\t GDATAH: %d\n",data_L,data_H);
 	data_g = data_H;
 	data_g = (data_g<<8);
 	data_g |=  data_L;
@@ -85,7 +84,7 @@ void read_als_data(){
 	//Read the blue channel!
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_BDATAL,&data_L);
 	i2c_reg_read_byte(dev_apds9960,APDS_ADDR,APDS_BDATAH,&data_H);
-	printk("CDATAL: %d\t CDATAH: %d\n",data_L,data_H);
+	//printk("CDATAL: %d\t CDATAH: %d\n",data_L,data_H);
 	data_b = data_H;
 	data_b = (data_b<<8);
 	data_b |=  data_L;
