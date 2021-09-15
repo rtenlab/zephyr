@@ -163,7 +163,7 @@ void main(void)
 		return;
 	}	
 	
-	# It begins over here fam 
+ 
 
 	while (1) {
 		//printk("Hello World! %s\n", CONFIG_ARCH);
