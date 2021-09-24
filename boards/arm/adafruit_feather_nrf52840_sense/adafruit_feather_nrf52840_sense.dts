@@ -155,3 +155,9 @@
 	compatible = "nordic,nrf-usbd";
 	status = "okay";
 };
+
+&pdm0 {
+  status = "okay";
+  clk-pin = <1>;
+  din-pin = <0>;
+};
