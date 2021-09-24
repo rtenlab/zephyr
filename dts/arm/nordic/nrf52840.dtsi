@@ -197,6 +197,14 @@
 			#pwm-cells = <1>;
 		};
 
+		pdm0: pdm@4001d000 {
+			compatible = "nordic, nrf-pdm";
+			reg = <0x4001c000 0x1000>;
+			interrupts = <29 NRF_DEFAULT_IRQ_PRIORITY>;
+			status = "disabled";
+			label = "PDM_0";
+		};
+
 		qdec: qdec@40012000 {
 			compatible = "nordic,nrf-qdec";
 			reg = <0x40012000 0x1000>;
