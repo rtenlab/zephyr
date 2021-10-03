@@ -11,6 +11,9 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(dmic_nrfx_pdm, CONFIG_AUDIO_DMIC_LOG_LEVEL);
 
+//#define USE_NRFX_PDM
+#define USE_ARDUINO_PDM
+
 struct dmic_nrfx_pdm_drv_data {
 	struct onoff_manager *clk_mgr;
 	struct onoff_client clk_cli;
@@ -60,6 +63,7 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 				LOG_ERR("Failed to set buffer: 0x%08x", err);
 				stop = true;
 			}
+      //LOG_ERR("event_handler: alloc buffer %p; nrfx_pdm_buffer_set\n", buffer);
 		}
 	}
 
@@ -74,6 +78,7 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 				(void)onoff_release(drv_data->clk_mgr);
 			}
 		}
+    //LOG_ERR("event_handler: stopping\n");
 	} else if (evt->buffer_released) {
 		ret = k_msgq_put(&drv_data->rx_queue,
 				 &evt->buffer_released,
@@ -82,15 +87,17 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 			LOG_ERR("No room in RX queue");
 			stop = true;
 
-			free_buffer(drv_data, evt->buffer_released);
+			//free_buffer(drv_data, evt->buffer_released); // BUG?
 		} else {
 			LOG_DBG("Queued buffer %p", evt->buffer_released);
 		}
+	  free_buffer(drv_data, evt->buffer_released); // FIXME: this should be released here, not above
 	}
 
 	if (stop) {
 		nrfx_pdm_stop();
 		drv_data->stopping = true;
+    //LOG_ERR("event_handler: stop\n");
 	}
 }
 
@@ -267,6 +274,226 @@ static bool find_suitable_clock(const struct dmic_nrfx_pdm_drv_cfg *drv_cfg,
 	return true;
 }
 
+#if defined(USE_ARDUINO_PDM)
+struct PDMDoubleBuffer 
+{
+  uint8_t* _buffer[2];
+  int _size;
+  volatile int _length[2];
+  volatile int _readOffset[2];
+  volatile int _index;
+};
+
+void doubleBuffer_reset(struct PDMDoubleBuffer *p, uint8_t *buf1, uint8_t *buf2, int size)
+{
+  p->_size = size;
+  p->_buffer[0] = buf1;
+  p->_buffer[1] = buf2;
+
+  memset(p->_buffer[0], 0x00, p->_size);
+  memset(p->_buffer[1], 0x00, p->_size);
+
+  p->_index = 0;
+  p->_length[0] = 0;
+  p->_length[1] = 0;
+  p->_readOffset[0] = 0;
+  p->_readOffset[1] = 0;
+}
+
+size_t doubleBuffer_availableForWrite(struct PDMDoubleBuffer *p)
+{
+  return (p->_size - (p->_length[p->_index] - p->_readOffset[p->_index]));
+}
+
+size_t doubleBuffer_write(struct PDMDoubleBuffer *p, const void *buffer, size_t size)
+{
+  size_t space = doubleBuffer_availableForWrite(p);
+
+  if (size > space) {
+    size = space;
+  }
+
+  if (size == 0) {
+    return 0;
+  }
+
+  memcpy(&(p->_buffer[p->_index][p->_length[p->_index]]), buffer, size);
+
+  p->_length[p->_index] += size;
+
+  return size;
+}
+
+size_t doubleBuffer_available(struct PDMDoubleBuffer *p)
+{
+  return p->_length[p->_index] - p->_readOffset[p->_index];
+}
+
+size_t doubleBuffer_read(struct PDMDoubleBuffer *p, void *buffer, size_t size)
+{
+  size_t avail = doubleBuffer_available(p);
+
+  if (size > avail) {
+    size = avail;
+  }
+
+  if (size == 0) {
+    return 0;
+  }
+
+  memcpy(buffer, &(p->_buffer[p->_index][p->_readOffset[p->_index]]), size);
+  p->_readOffset[p->_index] += size;
+
+  return size;
+}
+
+void* doubleBuffer_data(struct PDMDoubleBuffer *p)
+{
+  return (void*)(p->_buffer[p->_index]);
+}
+
+void doubleBuffer_swap(struct PDMDoubleBuffer *p, int length)
+{
+  if (p->_index == 0) {
+    p->_index = 1;
+  } else {
+    p->_index = 0;
+  }
+
+  p->_length[p->_index] = length;
+  p->_readOffset[p->_index] = 0;
+}
+
+#define DEFAULT_PDM_GAIN     20
+#define PDM_IRQ_PRIORITY     7
+
+#define DEFAULT_PDM_BUFFER_SIZE 512
+struct PDMDoubleBuffer doubleBuffer;
+uint8_t _buffer[2][DEFAULT_PDM_BUFFER_SIZE];
+uint8_t _channels;
+
+#include <hal/nrf_gpio.h>
+
+static int dmic_nrfx_pdm_configure_arduino(const struct device *dev,
+				   struct dmic_cfg *config)
+{
+ 	struct dmic_nrfx_pdm_drv_data *drv_data = dev->data;
+	const struct dmic_nrfx_pdm_drv_cfg *drv_cfg = dev->config;
+	struct pdm_chan_cfg *channel = &config->channel;
+	struct pcm_stream_cfg *stream = &config->streams[0];
+	nrfx_pdm_config_t nrfx_cfg;
+
+  nrfx_cfg = drv_cfg->nrfx_def_cfg;
+
+  // Enable high frequency oscillator if not already enabled
+  if (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {
+    NRF_CLOCK->TASKS_HFCLKSTART    = 1;
+    while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) { }
+  }
+  
+  // configure the sample rate and channels
+  switch (stream->pcm_rate) {
+    case 16000:
+      #ifndef NRF52832_XXAA
+      NRF_PDM->RATIO = ((PDM_RATIO_RATIO_Ratio80 << PDM_RATIO_RATIO_Pos) & PDM_RATIO_RATIO_Msk);
+      #endif
+      nrf_pdm_clock_set(NRF_PDM, NRF_PDM_FREQ_1280K);
+      break;
+    default:
+      return -1; // unsupported
+  }
+
+  switch (channel->req_num_chan) {
+    case 2:
+      nrf_pdm_mode_set(NRF_PDM, NRF_PDM_MODE_STEREO, NRF_PDM_EDGE_LEFTFALLING);
+      break;
+
+    case 1:
+      nrf_pdm_mode_set(NRF_PDM, NRF_PDM_MODE_MONO, NRF_PDM_EDGE_LEFTFALLING);
+      break;
+
+    default:
+      return -1; // unsupported
+  }
+  _channels = channel->req_num_chan;
+
+  nrf_pdm_gain_set(NRF_PDM, DEFAULT_PDM_GAIN, DEFAULT_PDM_GAIN);
+
+  // configure the I/O and mux
+  nrf_gpio_cfg_output(nrfx_cfg.pin_clk);
+  nrf_gpio_pin_clear(nrfx_cfg.pin_clk);
+
+  nrf_gpio_cfg_input(nrfx_cfg.pin_din, NRF_GPIO_PIN_NOPULL);
+  nrf_pdm_psel_connect(NRF_PDM, nrfx_cfg.pin_clk, nrfx_cfg.pin_din);
+
+  // clear events and enable PDM interrupts
+  nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_STARTED);
+  nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_END);
+  nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_STOPPED);
+  nrf_pdm_int_enable(NRF_PDM, NRF_PDM_INT_STARTED | NRF_PDM_INT_STOPPED);
+
+  // clear the buffer
+  doubleBuffer_reset(&doubleBuffer, _buffer[0], _buffer[1], DEFAULT_PDM_BUFFER_SIZE);
+
+  // set the PDM IRQ priority and enable
+  NVIC_SetPriority(PDM_IRQn, PDM_IRQ_PRIORITY);
+  NVIC_ClearPendingIRQ(PDM_IRQn);
+  NVIC_EnableIRQ(PDM_IRQn);
+
+  // enable and trigger start task
+  nrf_pdm_enable(NRF_PDM);
+  nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_STARTED);
+  nrf_pdm_task_trigger(NRF_PDM, NRF_PDM_TASK_START);  
+  
+  return 0;
+}
+
+extern short sampleBuffer[256];
+extern volatile int samplesRead;
+
+
+void nrfx_pdm_irq_handler_arduino()
+{
+  if (nrf_pdm_event_check(NRF_PDM, NRF_PDM_EVENT_STARTED)) {
+    nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_STARTED);
+
+    if (doubleBuffer_available(&doubleBuffer) == 0) {
+      // switch to the next buffer
+      nrf_pdm_buffer_set(NRF_PDM, (uint32_t*)doubleBuffer_data(&doubleBuffer), doubleBuffer_availableForWrite(&doubleBuffer) / (sizeof(int16_t) * _channels));
+
+      // make the current one available for reading
+      doubleBuffer_swap(&doubleBuffer, doubleBuffer_availableForWrite(&doubleBuffer));
+
+      // call receive callback if provided
+      //if (_onReceive) {
+      //  _onReceive();
+      //}
+      NVIC_DisableIRQ(PDM_IRQn);
+
+      // query the number of bytes available
+      int bytesAvailable = doubleBuffer_available(&doubleBuffer);
+
+      // read into the sample buffer
+      doubleBuffer_read(&doubleBuffer, sampleBuffer, bytesAvailable);
+
+      // 16-bit, 2 bytes per sample
+      samplesRead = bytesAvailable / 2;
+      
+      NVIC_EnableIRQ(PDM_IRQn);
+
+    } else {
+      // buffer overflow, stop
+      nrf_pdm_disable(NRF_PDM);
+    }
+  } else if (nrf_pdm_event_check(NRF_PDM, NRF_PDM_EVENT_STOPPED)) {
+    nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_STOPPED);
+  } else if (nrf_pdm_event_check(NRF_PDM, NRF_PDM_EVENT_END)) {
+    nrf_pdm_event_clear(NRF_PDM, NRF_PDM_EVENT_END);
+  }
+}
+
+#endif // USE_ARDUINO_PDM
+
 static int dmic_nrfx_pdm_configure(const struct device *dev,
 				   struct dmic_cfg *config)
 {
@@ -357,6 +584,16 @@ static int dmic_nrfx_pdm_configure(const struct device *dev,
 		drv_data->configured = false;
 	}
 
+  // FIXME: from Arduino. 
+  // Enable high frequency oscillator if not already enabled
+  if (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {
+    NRF_CLOCK->TASKS_HFCLKSTART    = 1;
+    while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) { }
+  }
+  nrfx_cfg.gain_l = 20;
+  nrfx_cfg.gain_r = 20;
+  // <<--
+
 	err = nrfx_pdm_init(&nrfx_cfg, drv_cfg->event_handler);
 	if (err != NRFX_SUCCESS) {
 		LOG_ERR("Failed to initialize PDM: 0x%08x", err);
@@ -371,7 +608,9 @@ static int dmic_nrfx_pdm_configure(const struct device *dev,
 	 * it is required to request the proper clock to be running
 	 * before starting the transfer itself.
 	 */
-	drv_data->request_clock = (drv_cfg->clk_src != PCLK32M);
+  // FIXME: commented out; do not wait for clock init 
+  // - when this code is enabled, the driver never calls start_transfer() 
+	//drv_data->request_clock = (drv_cfg->clk_src != PCLK32M); 
 	drv_data->configured = true;
 	return 0;
 }
@@ -381,6 +620,7 @@ static int start_transfer(struct dmic_nrfx_pdm_drv_data *drv_data)
 	nrfx_err_t err;
 	int ret;
 
+  printk("-- start_transfer\n");
 	err = nrfx_pdm_start();
 	if (err == NRFX_SUCCESS) {
 		return 0;
@@ -427,6 +667,7 @@ static int trigger_start(const struct device *dev)
 	 * first. If not, start the transfer directly.
 	 */
 	if (drv_data->request_clock) {
+    printk("trigger_start 1\n");
 		sys_notify_init_callback(&drv_data->clk_cli.notify,
 					 clock_started_callback);
 		ret = onoff_request(drv_data->clk_mgr, &drv_data->clk_cli);
@@ -437,6 +678,7 @@ static int trigger_start(const struct device *dev)
 			return -EIO;
 		}
 	} else {
+    printk("trigger_start 2\n");
 		ret = start_transfer(drv_data);
 		if (ret < 0) {
 			return ret;
@@ -526,10 +768,20 @@ static void init_clock_manager(const struct device *dev)
 }
 
 static const struct _dmic_ops dmic_ops = {
+#if defined(USE_NRFX_PDM)
 	.configure = dmic_nrfx_pdm_configure,
+#elif defined(USE_ARDUINO_PDM)
+	.configure = dmic_nrfx_pdm_configure_arduino,
+#endif
 	.trigger = dmic_nrfx_pdm_trigger,
 	.read = dmic_nrfx_pdm_read,
 };
+
+#if defined(USE_NRFX_PDM)
+  #define NRFS_PDM_IRQ_HANDLER nrfx_pdm_irq_handler
+#elif defined(USE_ARDUINO_PDM)
+  #define NRFS_PDM_IRQ_HANDLER nrfx_pdm_irq_handler_arduino
+#endif
 
 #define PDM(idx) DT_NODELABEL(pdm##idx)
 #define PDM_CLK_SRC(idx) DT_STRING_TOKEN(PDM(idx), clock_source)
@@ -540,7 +792,7 @@ static const struct _dmic_ops dmic_ops = {
 	static int pdm_nrfx_init##idx(const struct device *dev)		     \
 	{								     \
 		IRQ_CONNECT(DT_IRQN(PDM(idx)), DT_IRQ(PDM(idx), priority),   \
-			    nrfx_isr, nrfx_pdm_irq_handler, 0);		     \
+			    nrfx_isr, NRFS_PDM_IRQ_HANDLER, 0);		     \
 		irq_enable(DT_IRQN(PDM(idx)));				     \
 		k_msgq_init(&dmic_nrfx_pdm_data##idx.rx_queue,		     \
 			    (char *)rx_msgs##idx, sizeof(void *),	     \

@@ -17,15 +17,35 @@
 #define CHAN_SIZE		16
 #define PCM_BLK_SIZE_MS		((AUDIO_FREQ/1000) * sizeof(int16_t))
 
-#define NUM_MS		1000
+//#define USE_NRFX_PDM
+#define USE_ARDUINO_PDM
 
-K_MEM_SLAB_DEFINE(rx_mem_slab, PCM_BLK_SIZE_MS, NUM_MS, 1);
+#if defined(USE_NRFX_PDM)
+
+#define NUM_MS		400
+#define MARGIN_MS 100
+
+// slab memory allocation pool for dmic_nrfx_pdm driver
+K_MEM_SLAB_DEFINE(rx_mem_slab, PCM_BLK_SIZE_MS, NUM_MS + MARGIN_MS, 1); 
+
+// buffer for application
+uint8_t rx_block[NUM_MS][PCM_BLK_SIZE_MS];
+
+#elif defined (USE_ARDUINO_PDM)
+
+// For Arduino
+short sampleBuffer[256];
+volatile int samplesRead;
+
+#endif
 
 struct pcm_stream_cfg mic_streams = {
 	.pcm_rate = AUDIO_FREQ,
 	.pcm_width = CHAN_SIZE,
 	.block_size = PCM_BLK_SIZE_MS,
+#if defined(USE_NRFX_PDM)
 	.mem_slab = &rx_mem_slab,
+#endif
 };
 
 struct dmic_cfg cfg = {
@@ -41,9 +61,6 @@ struct dmic_cfg cfg = {
 	},
 };
 
-void *rx_block[NUM_MS];
-size_t rx_size = PCM_BLK_SIZE_MS;
-
 static inline short min(short a, short b)
 {
   if (a > b) return b;
@@ -55,50 +72,56 @@ static inline short max(short a, short b)
   return a;
 }
 
+
 void main(void)
 {
-	const struct device *dev = device_get_binding(
+  const struct device *dev = device_get_binding(
 			CONFIG_UART_CONSOLE_ON_DEV_NAME);
 
   const struct device *mic_dev = device_get_binding(DT_LABEL(DT_NODELABEL(pdm0)));
 
-	uint32_t dtr = 0;
-  int ret, i;
-  uint32_t ms;
+  uint32_t dtr = 0;
+  int ret;
 
-	if (usb_enable(NULL)) {
-		return;
-	}
+  if (usb_enable(NULL)) {
+    return;
+  }
 
-	/* Poll if the DTR flag was set, optional */
-	while (!dtr) {
-		uart_line_ctrl_get(dev, UART_LINE_CTRL_DTR, &dtr);
-	}
+  /* Poll if the DTR flag was set, optional */
+  while (!dtr) {
+    uart_line_ctrl_get(dev, UART_LINE_CTRL_DTR, &dtr);
+  }
 
-	if (strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME) !=
-	    strlen("CDC_ACM_0") ||
-	    strncmp(CONFIG_UART_CONSOLE_ON_DEV_NAME, "CDC_ACM_0",
-		    strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME))) {
-		printk("Error: Console device name is not USB ACM\n");
+  if (strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME) !=
+      strlen("CDC_ACM_0") ||
+      strncmp(CONFIG_UART_CONSOLE_ON_DEV_NAME, "CDC_ACM_0",
+        strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME))) {
+    printk("Error: Console device name is not USB ACM\n");
 
-		return;
-	}
+    return;
+  }
   
   k_sleep(K_SECONDS(5));
   printk("Hello World! %s\n", CONFIG_ARCH);
   printk("Mic config start\n");
 
-	if (!mic_dev) {
-		printk("Could not get pointer to %s device\n",
-			DT_LABEL(DT_NODELABEL(pdm0)));
-		return;
-	}
+  if (!mic_dev) {
+    printk("Could not get pointer to %s device\n",
+      DT_LABEL(DT_NODELABEL(pdm0)));
+    return;
+  }
 
-	ret = dmic_configure(mic_dev, &cfg);
-	if (ret < 0) {
-		printk("microphone configuration error\n");
-		return;
-	}
+  ret = dmic_configure(mic_dev, &cfg);
+  if (ret < 0) {
+    printk("microphone configuration error\n");
+    return;
+  }
+
+#if defined(USE_NRFX_PDM)
+  for (int i = 0; i < NUM_MS; i++) {
+    for (int j = 0; j < PCM_BLK_SIZE_MS; j++) 
+      rx_block[i][j] = 0xff; // initialize 
+  }
 
   while (1) {
   	ret = dmic_trigger(mic_dev, DMIC_TRIGGER_START);
@@ -110,11 +133,13 @@ void main(void)
     printk("signal_sampling_started\n");
   
   	/* Acquire microphone audio */
-  	for (ms = 0U; ms < NUM_MS; ms++) {
-  		ret = dmic_read(mic_dev, 0, &rx_block[ms], &rx_size, 2000);
+  	for (int ms = 0; ms < NUM_MS; ms++) {
+      int rx_size;
+  		ret = dmic_read(mic_dev, 0, (void**)&rx_block[ms], &rx_size, 2000);
   		if (ret < 0) {
   			printk("microphone audio read error\n");
   	    dmic_trigger(mic_dev, DMIC_TRIGGER_STOP);
+        k_sleep(K_MSEC(300));
         break;
   		}
   	}
@@ -127,23 +152,51 @@ void main(void)
   		printk("microphone stop trigger error\n");
       continue;
   	}
-  	int j;
   
     short minwave = 30000;
     short maxwave = -30000;
 
-  	for (i = 0; i < NUM_MS; i++) {
-  		uint16_t *pcm_out = rx_block[i];
-  
-      
-  		for (j = 0; j < rx_size/2; j++) {
-  			//printk("0x%04x,\n", pcm_out[j]);
-  			printk("%d ", pcm_out[j]);
+  	for (int i = 0; i < NUM_MS; i++) {
+      short *pcm_out = (short*)rx_block[i];
+
+      for (int j = 0; j < PCM_BLK_SIZE_MS / 2; j++) {
+        //printk("0x%04x,\n", pcm_out[j]);
+        printk("%d ", pcm_out[j]);
         minwave = min(minwave, pcm_out[j]);
         maxwave = max(maxwave, pcm_out[j]);
-  		}
+      }
       printk("\nmic: %d\n", maxwave - minwave);
-      
-  	}
+    }
   }
+
+#elif defined(USE_ARDUINO_PDM)
+  // Arduino approach: polling
+  while (1) {
+    samplesRead = 0;
+
+    int32_t samples = 400;
+    
+    short minwave = 30000;
+    short maxwave = -30000;
+
+    while (samples > 0) {
+      if (!samplesRead) {
+        k_yield();
+        continue;
+      }
+      for (int i = 0; i < samplesRead; i++) {
+        minwave = min(sampleBuffer[i], minwave);
+        maxwave = max(sampleBuffer[i], maxwave);
+        samples--;
+        printk("%d ", sampleBuffer[i]);
+        if ((i % 16) == 0) printk("\n"); 
+      }
+      // clear the read count
+      samplesRead = 0;
+    }
+    printk("\nmic: %d\n", maxwave - minwave);
+
+    k_sleep(K_MSEC(300));
+  }
+#endif
 }

@@ -160,4 +160,5 @@
   status = "okay";
   clk-pin = <1>;
   din-pin = <0>;
+  queue-size = <16>;
 };
