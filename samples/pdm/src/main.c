@@ -188,14 +188,16 @@ void main(void)
         minwave = min(sampleBuffer[i], minwave);
         maxwave = max(sampleBuffer[i], maxwave);
         samples--;
-        printk("%d ", sampleBuffer[i]);
-        if ((i % 16) == 0) printk("\n"); 
+        //Like if you really want to see the buffer values, you can uncomment it
+        //printk("%d ", sampleBuffer[i]); 
+        if ((i % 16) == 0) printk("\n"); //This is the original
       }
       // clear the read count
       samplesRead = 0;
+      printk("\nmic: %d\n", maxwave - minwave);
     }
-    printk("\nmic: %d\n", maxwave - minwave);
-
+    //printk("\nmic: %d\n", maxwave - minwave);
+    
     k_sleep(K_MSEC(300));
   }
 #endif
