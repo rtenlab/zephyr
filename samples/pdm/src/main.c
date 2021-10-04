@@ -190,7 +190,20 @@ void main(void)
         samples--;
         //Like if you really want to see the buffer values, you can uncomment it
         //printk("%d ", sampleBuffer[i]); 
-        if ((i % 16) == 0) printk("\n"); //This is the original
+
+
+        //if ((i % 16) == 0) printk("\n"); This is the original
+
+        if ((i % 16) == 0) {
+          printk("\n");
+          ret = dmic_trigger(mic_dev, DMIC_TRIGGER_STOP);
+          if (ret < 0) {
+            printk("microphone stop trigger error\n");
+            continue;
+            }
+          }
+
+
       }
       // clear the read count
       samplesRead = 0;
