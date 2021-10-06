@@ -177,7 +177,7 @@ void main(void){
 
     i2c_configure(dev_bmp280, I2C_SPEED_SET(I2C_SPEED_STANDARD));
    
-	i2c_reg_read_byte(dev_bmp280,0x77,0xD0,&data_bmp280);															// This command the configure the APDS9960 sensor and enables the proximity and ALS property on the device.
+	i2c_reg_read_byte(dev_bmp280,0x77,0xD0,&data_bmp280);															
 	if(data_bmp280==88)
 		printk("Bosch BMP280 Found!\n");
 
