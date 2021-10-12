@@ -58,9 +58,9 @@ void main(void){
 
     i2c_configure(dev_lis3mdl, I2C_SPEED_SET(I2C_SPEED_STANDARD));
    
-	i2c_reg_read_byte(dev_lis3mdl,0x1C,0x0F,&data_lis);															// This command the configure the APDS9960 sensor and enables the proximity and ALS property on the device.
+	i2c_reg_read_byte(dev_lis3mdl,0x1C,0x0F,&data_lis);						
 	if(data_lis==61)
-		printk("Sensor found Found!\n");
+		printk("Sensor Found!\n");
 
   }	
   return;
