@@ -79,7 +79,7 @@ void main(void)
 			CONFIG_UART_CONSOLE_ON_DEV_NAME);
 
   const struct device *mic_dev = device_get_binding(DT_LABEL(DT_NODELABEL(pdm0)));
-
+  
   uint32_t dtr = 0;
   int ret;
 
@@ -171,6 +171,8 @@ void main(void)
 
 #elif defined(USE_ARDUINO_PDM)
   // Arduino approach: polling
+  struct k_timer my_timer;
+  
   while (1) {
     samplesRead = 0;
 
@@ -188,7 +190,7 @@ void main(void)
         minwave = min(sampleBuffer[i], minwave);
         maxwave = max(sampleBuffer[i], maxwave);
         samples--;
-        //Like if you really want to see the buffer values, you can uncomment it
+        //write the values into the file here
         //printk("%d ", sampleBuffer[i]); 
 
 
