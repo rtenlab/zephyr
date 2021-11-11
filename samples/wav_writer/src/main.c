@@ -125,6 +125,22 @@ void main(void)
 		return;
 	}
 
+	k_sleep(K_SECONDS(5));
+	printk("Hello World! %s\n", CONFIG_ARCH);
+	printk("Mic config start\n");
+
+	if (!mic_dev) {
+		printk("Could not get pointer to %s device\n",
+		DT_LABEL(DT_NODELABEL(pdm0)));
+		return;
+	}
+
+	ret = dmic_configure(mic_dev, &cfg);
+	if (ret < 0) {
+		printk("microphone configuration error\n");
+		return;
+	}
+
 	struct fs_mount_t *mp =
 #if DT_NODE_EXISTS(PARTITION_NODE)
 		&FS_FSTAB_ENTRY(PARTITION_NODE)
@@ -195,6 +211,21 @@ void main(void)
 		printk("\tfn '%s' siz %u\n", dirent.name, dirent.size);
 	}
 
+	// This is the WAV Header format
+	char chunkID[4] = {'R', 'I', 'F', 'F'};
+	uint32_t chunkSize = 36;
+	char format[4] = {'W', 'A', 'V', 'E'};
+	char subChunk1ID[4] = {'f', 'm', 't', ' '};
+	uint32_t subChunk1Size = 16;
+	uint16_t audioFormat = 1;
+	uint16_t numChannels = 1;
+	uint32_t sampleRate = 44100;
+	uint32_t byteRate = 44100 * 2;
+	uint16_t blockAlign = 2;
+	uint16_t bitsPerSample = 16;
+	char subChunk2ID[4] = {'d', 'a', 't', 'a'};
+	uint32_t subChunk2Size = 0;
+
 	struct fs_file_t file;
 
 	fs_file_t_init(&file);
@@ -205,7 +236,7 @@ void main(void)
 		goto out;
 	}
 
-	uint32_t boot_count = 0;
+
 
 	if (rc >= 0) {
 		rc = fs_read(&file, &boot_count, sizeof(boot_count));
@@ -215,39 +246,16 @@ void main(void)
 
 	}
 
-	boot_count += 1;
-	rc = fs_write(&file, &boot_count, sizeof(boot_count));
-	printk("%s write new boot count %u: %d\n", fname,
-	       boot_count, rc);
-
+	// boot_count += 1;
+	rc = fs_write(&file, &chunkID, sizeof(chunkID));
+	rc = fs_write(&file, &chunkSize, sizeof(chunkSize));
+	rc = fs_write(&file, &format, sizeof(format));
+	rc = fs_write(&file, &chunkID, sizeof(chunkID));
+	rc = fs_write(&file, &chunkID, sizeof(chunkID));
+	
+	// Write Header and Data over here
 	rc = fs_close(&file);
 	printk("%s close: %d\n", fname, rc);
-
-	struct fs_dir_t dir;
-
-	fs_dir_t_init(&dir);
-
-	rc = fs_opendir(&dir, mp->mnt_point);
-	printk("%s opendir: %d\n", mp->mnt_point, rc);
-
-	while (rc >= 0) {
-		struct fs_dirent ent = { 0 };
-
-		rc = fs_readdir(&dir, &ent);
-		if (rc < 0) {
-			break;
-		}
-		if (ent.name[0] == 0) {
-			printk("End of files\n");
-			break;
-		}
-		printk("  %c %u %s\n",
-		       (ent.type == FS_DIR_ENTRY_FILE) ? 'F' : 'D',
-		       ent.size,
-		       ent.name);
-	}
-
-	(void)fs_closedir(&dir);
 
 out:
 	rc = fs_unmount(mp);
