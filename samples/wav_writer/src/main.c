@@ -225,7 +225,7 @@ void main(void)
 	uint16_t bitsPerSample = 16;
 	char subChunk2ID[4] = {'d', 'a', 't', 'a'};
 	uint32_t subChunk2Size = 0;
-
+	int boot_count = 0;
 	struct fs_file_t file;
 
 	fs_file_t_init(&file);
@@ -247,12 +247,20 @@ void main(void)
 	}
 
 	// boot_count += 1;
-	rc = fs_write(&file, &chunkID, sizeof(chunkID));
+	rc = fs_write(&file, chunkID, sizeof(chunkID));
 	rc = fs_write(&file, &chunkSize, sizeof(chunkSize));
-	rc = fs_write(&file, &format, sizeof(format));
-	rc = fs_write(&file, &chunkID, sizeof(chunkID));
-	rc = fs_write(&file, &chunkID, sizeof(chunkID));
-	
+	rc = fs_write(&file, format, sizeof(format));
+	rc = fs_write(&file, subChunk1ID, sizeof(subChunk1ID));
+	rc = fs_write(&file, &subChunk1Size, sizeof(subChunk1Size));
+	rc = fs_write(&file, &audioFormat, sizeof(audioFormat));
+	rc = fs_write(&file, &numChannels, sizeof(numChannels));
+	rc = fs_write(&file, &sampleRate, sizeof(sampleRate));
+	rc = fs_write(&file, &byteRate, sizeof(byteRate));
+	rc = fs_write(&file, &blockAlign, sizeof(blockAlign));
+	rc = fs_write(&file, &bitsPerSample, sizeof(bitsPerSample));
+	rc = fs_write(&file, subChunk2ID, sizeof(subChunk2ID));
+	rc = fs_write(&file, &subChunk2Size, sizeof(subChunk2Size));
+	printk("File writing is complete");
 	// Write Header and Data over here
 	rc = fs_close(&file);
 	printk("%s close: %d\n", fname, rc);
