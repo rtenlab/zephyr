@@ -264,7 +264,31 @@ void main(void)
 	// Write Header and Data over here
 	rc = fs_close(&file);
 	printk("%s close: %d\n", fname, rc);
+		struct fs_dir_t dir;
 
+	fs_dir_t_init(&dir);
+
+	rc = fs_opendir(&dir, mp->mnt_point);
+	printk("%s opendir: %d\n", mp->mnt_point, rc);
+
+	while (rc >= 0) {
+		struct fs_dirent ent = { 0 };
+
+		rc = fs_readdir(&dir, &ent);
+		if (rc < 0) {
+			break;
+		}
+		if (ent.name[0] == 0) {
+			printk("End of files\n");
+			break;
+		}
+		printk("  %c %u %s\n",
+		       (ent.type == FS_DIR_ENTRY_FILE) ? 'F' : 'D',
+		       ent.size,
+		       ent.name);
+	}
+
+	(void)fs_closedir(&dir);
 out:
 	rc = fs_unmount(mp);
 	printk("%s unmount: %d\n", mp->mnt_point, rc);

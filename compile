@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [[ "$#" -eq 1 && "$1" != "clean" && "$1" != "upload" ]]; then
+    echo "Roger that, compiling ...."
+    west build -b adafruit_feather_nrf52840_sense samples/$1
+    adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x00B6 --application build/zephyr/zephyr.hex build/zephyr/zephyr.zip
+elif [[ "$#" -eq 1 && "$1" = "clean" ]]; then
+    echo "Roger that, cleaning ...."
+    sudo rm -rf build
+elif [[ "$#" -eq 1 && "$1" = "upload" ]]; then
+    echo "Roger that, granting permissions and uploading"
+    sudo chmod a+rw /dev/ttyACM0
+    adafruit-nrfutil --verbose dfu serial -pkg build/zephyr/zephyr.zip -p /dev/ttyACM0 -b 115200 --singlebank
+else
+    echo "Weird"
+    exit 1;
+fi
