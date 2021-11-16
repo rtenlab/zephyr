@@ -37,6 +37,8 @@ void main(void)
 
 	while (1) {
 		printk("Hello World! %s\n", CONFIG_ARCH);
+		float dev = 100.00;
+		printk("%f\n",dev);
 		k_sleep(K_SECONDS(1));
 	}
 }
