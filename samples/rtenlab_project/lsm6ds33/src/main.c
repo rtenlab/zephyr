@@ -31,10 +31,11 @@
 
 #define ACC_104_HZ 0x20		// Set gyroscope data rate to 104HZ
 #define GYRO_104_HZ 0x20	// Set Accel. data rate to 104HZ
+// below value can be found on this website: https://github.com/adafruit/Adafruit_Sensor/blob/master/Adafruit_Sensor.h
 #define SENSORS_DPS_TO_RADS (0.017453293F)		
 
 const struct device *dev_i2c;															// Device struct to get device binding for I2C
-uint16_t LSM6DS_ADDR = 0x6A;																		// Address of the Sensor on I2C bus as described by Adafruit website
+uint16_t LSM6DS_ADDR = 0x6A;															// Address of the Sensor on I2C bus as described by Adafruit website
 
 int16_t data_buffer[7];	// Buffer to hold the 16-bit data for each paramter in gyroscope and accel.
 float temperature_sensitivity = 256.0;
