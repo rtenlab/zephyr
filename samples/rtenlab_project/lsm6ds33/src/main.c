@@ -29,16 +29,21 @@
 #define OUT_TEMP_L 0x20
 #define OUT_TMP_H 0x21
 
-#define ACC_104_HZ 0x20		// Set gyroscope data rate to 104HZ
-#define GYRO_104_HZ 0x20	// Set Accel. data rate to 104HZ
-// below value can be found on this website: https://github.com/adafruit/Adafruit_Sensor/blob/master/Adafruit_Sensor.h
+#define ACC_104_HZ_4G 0x28		// Set gyroscope data rate to 104HZ
+#define GYRO_104_HZ_1000dps 0x28	// Set Accel. data rate to 104HZ
+// below values can be found on this website: https://github.com/adafruit/Adafruit_Sensor/blob/master/Adafruit_Sensor.h
 #define SENSORS_DPS_TO_RADS (0.017453293F)		
+#define SENSORS_GRAVITY_STANDARD (9.80665f)
+
+
 
 const struct device *dev_i2c;															// Device struct to get device binding for I2C
 uint16_t LSM6DS_ADDR = 0x6A;															// Address of the Sensor on I2C bus as described by Adafruit website
 
 int16_t data_buffer[7];	// Buffer to hold the 16-bit data for each paramter in gyroscope and accel.
 float temperature_sensitivity = 256.0;
+float accel_scale_4_G = 0.122;
+float gyro_scale_1000_dps = 35.0;
 
 typedef struct lsm6ds33{
 	uint16_t temp;
@@ -49,6 +54,7 @@ typedef struct lsm6ds33{
 		  accelY,
 		  accelZ;
 }lsm6ds33_t;
+
 /**
 *@FUNCTION: API to configure the uart console for printk statements.
 */
@@ -89,20 +95,29 @@ void check_device(){
 		printk("LSM6DS33 device found!\n");
 }
 
-void set_acc_data_rate(void){
-	int ret = i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, CTRL1_XL, ACC_104_HZ); 	
+/**
+ * @FUNCTION: This function sets the CTRL1_XL register on the sensor to get the accel data rate to 104Hz and 4G data range.
+ */
+void set_acc_data_rate_range(void){
+	int ret = i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, CTRL1_XL, ACC_104_HZ_4G); 	
 	if(ret != 0)
 		printk("Error while setting the ACC_range!\n");
 	return;
 }
 
-void set_gyro_data_rate(void){
-	int ret = i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, CTRL2_G, GYRO_104_HZ); 	
+/**
+ * @FUNCTION: This function sets the CTRL2_G register on the sensor to get the accel data rate to 104Hz and 1000dps data range.
+ */
+void set_gyro_data_rate_range(void){
+	int ret = i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, CTRL2_G, GYRO_104_HZ_1000dps); 	
 	if(ret!=0)
 		printk("Error while setting the gyro_range!\n");
 	return;
 }
 
+/**
+ * @FUNCTION: This function pools the status of the sensor by reading the status register.
+ */
 void status_reg(void){
 	uint8_t status=0;
 	int ret = i2c_reg_read_byte(dev_i2c, LSM6DS_ADDR, STATUS_REG, &status);
@@ -112,33 +127,35 @@ void status_reg(void){
 	return;
 }
 
-// Need to work on this!
-
+/**
+ * @FUNCTION: This function gets the data from the sensor in bursts.
+ */
 void read_burst_data(lsm6ds33_t *data){
 	uint8_t buffer[14];
 	i2c_burst_read(dev_i2c, LSM6DS_ADDR, OUT_TEMP_L, &buffer[0], 14);
 	for(int i=0; i<13; i+=2){
 		data_buffer[i/2] = buffer[i+1] << 8 | buffer[i];
+//		printf("data_buffer[%d] = buffer[%d] << 8 | buffer[%d]\n", i/2, i+1, i);
 	}
-	// data_buffer[0] = buffer[1]<<8 | buffer[8];
-	// uint16_t temp = (data_buffer[0]/temperature_sensitivity)+25.0;
-	// data_buffer[1] = buffer[3] << 8 | buffer[2];
-	// data_buffer[2]= buffer[5] << 8 | buffer[4];
-	// data_buffer[3] = buffer[7] << 8 | buffer[6];
-	data->gyroX = data_buffer[1] * 8.75 *  SENSORS_DPS_TO_RADS/1000.0;
-	data->gyroY = data_buffer[2] * 8.75 *  SENSORS_DPS_TO_RADS/1000.0;
-	data->gyroZ = data_buffer[3] * 8.75 *  SENSORS_DPS_TO_RADS/1000.0;
+	data->gyroX = data_buffer[1] * gyro_scale_1000_dps *  SENSORS_DPS_TO_RADS/1000.0;
+	data->gyroY = data_buffer[2] * gyro_scale_1000_dps *  SENSORS_DPS_TO_RADS/1000.0;
+	data->gyroZ = data_buffer[3] * gyro_scale_1000_dps *  SENSORS_DPS_TO_RADS/1000.0;
+
+	data->accelX = data_buffer[4] * accel_scale_4_G * SENSORS_GRAVITY_STANDARD / 1000;
+	data->accelY = data_buffer[5] * accel_scale_4_G  *SENSORS_GRAVITY_STANDARD / 1000;
+	data->accelZ = data_buffer[6] * accel_scale_4_G  *SENSORS_GRAVITY_STANDARD / 1000;
 	return;
 }
 
 void print_data(lsm6ds33_t *data){
-	printf("Gyro: %f\t %f\t %f\n",data->gyroX, data->gyroY, data->gyroZ);
+	printf("Gyro: %f\t %f\t %f  dps\n",data->gyroX, data->gyroY, data->gyroZ);
+	printf("Accel: %f\t %f\t %f\n",data->accelX, data->accelY, data->accelZ);
 	return;
 }
 
 void lsm6ds33_init(void){
-	set_gyro_data_rate();
-	set_acc_data_rate();
+	set_gyro_data_rate_range();
+	set_acc_data_rate_range();
 
 }
 void main(void){
