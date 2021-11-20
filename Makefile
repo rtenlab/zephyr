@@ -1,3 +1,7 @@
+#right your most recent used here
+all:
+	./make.sh scd41
+	./flash.sh
 lsm:
 	./make.sh lsm6ds33
 	./flash.sh
@@ -14,9 +18,9 @@ bmp:
 	./make.sh bmp280
 	./flash.sh
 
-#right your most recent used here
-all:
-	./make.sh lsm6ds33
+scd:
+	./make.sh scd41
 	./flash.sh
+
 
 
