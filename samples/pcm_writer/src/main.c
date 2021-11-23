@@ -154,7 +154,7 @@ void main(void)
 	const struct flash_area *pfa;
 	int rc;
 
-	snprintf(fname, sizeof(fname), "%s/boot_count", mp->mnt_point);
+	snprintf(fname, sizeof(fname), "%s/pcm_values.txt", mp->mnt_point);
 
 	rc = flash_area_open(id, &pfa);
 	if (rc < 0) {
@@ -191,80 +191,55 @@ void main(void)
 	printk("%s automounted\n", mp->mnt_point);
 #endif
 
-	rc = fs_statvfs(mp->mnt_point, &sbuf);
-	if (rc < 0) {
-		printk("FAIL: statvfs: %d\n", rc);
-		goto out;
-	}
-
-	printk("%s: bsize = %lu ; frsize = %lu ;"
-	       " blocks = %lu ; bfree = %lu\n",
-	       mp->mnt_point,
-	       sbuf.f_bsize, sbuf.f_frsize,
-	       sbuf.f_blocks, sbuf.f_bfree);
-
-	struct fs_dirent dirent;
-
-	rc = fs_stat(fname, &dirent);
-	printk("%s stat: %d\n", fname, rc);
-	if (rc >= 0) {
-		printk("\tfn '%s' siz %u\n", dirent.name, dirent.size);
-	}
-
-	// This is the WAV Header format
-	char chunkID[4] = {'R', 'I', 'F', 'F'};
-	uint32_t chunkSize = 36;
-	char format[4] = {'W', 'A', 'V', 'E'};
-	char subChunk1ID[4] = {'f', 'm', 't', ' '};
-	uint32_t subChunk1Size = 16;
-	uint16_t audioFormat = 1;
-	uint16_t numChannels = 1;
-	uint32_t sampleRate = 44100;
-	uint32_t byteRate = 44100 * 2;
-	uint16_t blockAlign = 2;
-	uint16_t bitsPerSample = 16;
-	char subChunk2ID[4] = {'d', 'a', 't', 'a'};
-	uint32_t subChunk2Size = 0;
-	int boot_count = 0;
+// Declare the file
 	struct fs_file_t file;
-
+// Initialise the file
 	fs_file_t_init(&file);
-
-	rc = fs_open(&file, fname, FS_O_CREATE | FS_O_RDWR);
+// Open the File, Create if not there, read write the file if it is
+	rc = fs_open(&file, fname, FS_O_CREATE);
 	if (rc < 0) {
 		printk("FAIL: open %s: %d\n", fname, rc);
 		goto out;
 	}
 
+	int samples_read = 0;
+    int32_t samples = 400;    
+    short minwave = 30000;
+    short maxwave = -30000;
 
+	while (samples > 0) {
+    	if (!samplesRead) {
+    		k_yield();
+        	continue;
+      }
+      for (int i = 0; i < samplesRead; i++) {
+        minwave = min(sampleBuffer[i], minwave);
+        maxwave = max(sampleBuffer[i], maxwave);
+        samples--;
+		//moves file position to the end of the file
+		rc = fs_seek(&file, 0, FS_SEEK_END);
+        //write the values into the file here
+		rc = fs_write(&file, &sampleBuffer[i], sizeof(sampleBuffer[i]));
+        printk("%d ", sampleBuffer[i]); 
 
-	if (rc >= 0) {
-		rc = fs_read(&file, &boot_count, sizeof(boot_count));
-		printk("%s read count %u: %d\n", fname, boot_count, rc);
-		rc = fs_seek(&file, 0, FS_SEEK_SET);
-		printk("%s seek start: %d\n", fname, rc);
-
+        if ((i % 16) == 0) {
+          	printk("\n");
+          	ret = dmic_trigger(mic_dev, DMIC_TRIGGER_STOP);
+        	if (ret < 0) {
+            	printk("microphone stop trigger error\n");
+            	continue;
+        	}
+        }
+      }
+	  // clear the read count for the loop to continue up top
+	  samplesRead = 0;
 	}
-
-	// boot_count += 1;
-	rc = fs_write(&file, chunkID, sizeof(chunkID));
-	rc = fs_write(&file, &chunkSize, sizeof(chunkSize));
-	rc = fs_write(&file, format, sizeof(format));
-	rc = fs_write(&file, subChunk1ID, sizeof(subChunk1ID));
-	rc = fs_write(&file, &subChunk1Size, sizeof(subChunk1Size));
-	rc = fs_write(&file, &audioFormat, sizeof(audioFormat));
-	rc = fs_write(&file, &numChannels, sizeof(numChannels));
-	rc = fs_write(&file, &sampleRate, sizeof(sampleRate));
-	rc = fs_write(&file, &byteRate, sizeof(byteRate));
-	rc = fs_write(&file, &blockAlign, sizeof(blockAlign));
-	rc = fs_write(&file, &bitsPerSample, sizeof(bitsPerSample));
-	rc = fs_write(&file, subChunk2ID, sizeof(subChunk2ID));
-	rc = fs_write(&file, &subChunk2Size, sizeof(subChunk2Size));
-	printk("File writing is complete");
-	// Write Header and Data over here
+	printk("\nthe sample read has been completed\n");
 	rc = fs_close(&file);
-	printk("%s close: %d\n", fname, rc);
-		struct fs_dir_t dir;
+	printk("\nthe file has been closed");
+
+	
+	struct fs_dir_t dir;
 
 	fs_dir_t_init(&dir);
 
@@ -289,6 +264,8 @@ void main(void)
 	}
 
 	(void)fs_closedir(&dir);
+
+	
 out:
 	rc = fs_unmount(mp);
 	printk("%s unmount: %d\n", mp->mnt_point, rc);
