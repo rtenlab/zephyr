@@ -1,43 +1,9 @@
 #include "scd41.h"
  
-const struct device *dev_i2c; 
+// const struct device *dev_i2c; 
       // Device struct to get device binding for I2C
 uint16_t SCD41_ADDR = 0x62;		// Address of the Sensor on I2C bus as described by Adafruit website
 uint8_t command_to_sensor[NUM_BYTES_TO_SENSOR];
-
-
-/**
-*@FUNCTION: API to configure the uart console for printk statements.
-*/
-void enable_uart_console(void){
-	const struct device  *dev_usb;																										// Device for USB Console.
-	uint32_t dtr=0;
-	
-
-	dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
-	if(usb_enable(NULL))
-		return;
-	
-	while(!dtr)
-		uart_line_ctrl_get(dev_usb,UART_LINE_CTRL_DTR, &dtr);	
-	  
-	return;
-}
-
-/**
-*@FUNCTION: API to configure the I2C device.
-*/
-void configure_device(void){
-	dev_i2c = device_get_binding(I2C_DEV);
-	i2c_configure(dev_i2c, I2C_SPEED_SET(I2C_SPEED_STANDARD));
-	if (dev_i2c == NULL) {
-		printk("I2C: Device driver not found\n");
-	}
-	else{
-		printk("I2C: Device driver found!!!\n");
-	}
-	return;
-}
 
 
 
@@ -145,7 +111,7 @@ void measure_single_shot(scd41_t* data){
 /**
  * FUNCTION: function to print the data obtained from the sensor.
  */
-void print_data(scd41_t* data){
+void print_data_scd(scd41_t* data){
     	printf("CO2:%d\t Hum:%f\t Temp: %f\n", data->Co2, data->hum, data->temp);
 	return;
 }

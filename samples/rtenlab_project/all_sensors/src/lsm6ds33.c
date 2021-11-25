@@ -1,6 +1,6 @@
 #include "lsm6ds33.h"
 
-const struct device *dev_i2c;															// Device struct to get device binding for I2C
+// const struct device *dev_i2c;															// Device struct to get device binding for I2C
 uint16_t LSM6DS_ADDR = 0x6A;															// Address of the Sensor on I2C bus as described by Adafruit website
 
 int16_t data_buffer[7];	// Buffer to hold the 16-bit data for each paramter in gyroscope and accel.
@@ -8,38 +8,7 @@ float temperature_sensitivity = 256.0;
 float accel_scale_4_G = 0.122;
 float gyro_scale_1000_dps = 35.0;
 
-/**
-*@FUNCTION: API to configure the uart console for printk statements.
-*/
-void enable_uart_console(void){
-	const struct device  *dev_usb;																										// Device for USB Console.
-	uint32_t dtr=0;
-	
 
-	dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
-	if(usb_enable(NULL))
-		return;
-	
-	while(!dtr)
-		uart_line_ctrl_get(dev_usb,UART_LINE_CTRL_DTR, &dtr);	
-	  
-	return;
-}
-
-/**
-*@FUNCTION: API to configure the I2C device.
-*/
-void configure_device(void){
-	dev_i2c = device_get_binding(I2C_DEV);
-	i2c_configure(dev_i2c, I2C_SPEED_SET(I2C_SPEED_STANDARD));
-	if (dev_i2c == NULL) {
-		printk("I2C: Device driver not found\n");
-	}
-	else{
-		printk("I2C: Device driver found!!!\n");
-	}
-	return;
-}
 
 void check_device(void){
 	uint8_t device_id=0;
@@ -100,7 +69,7 @@ void read_burst_data(lsm6ds33_t *data){
 	return;
 }
 
-void print_data(lsm6ds33_t *data){
+void print_data_lsm(lsm6ds33_t *data){
 	printf("Gyro: %f\t %f\t %f  dps\n",data->gyroX, data->gyroY, data->gyroZ);
 	printf("Accel: %f\t %f\t %f\n",data->accelX, data->accelY, data->accelZ);
 	return;

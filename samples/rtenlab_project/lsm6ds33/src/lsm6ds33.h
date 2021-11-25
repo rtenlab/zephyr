@@ -1,12 +1,12 @@
+#ifndef LSM6DS33_H
+#define LSM6DS33_H
+
 #include <stdio.h>
 #include <zephyr.h>
 #include <sys/printk.h>
-#include <device.h>
-#include <drivers/i2c.h>
-#include <usb/usb_device.h>
-#include <drivers/uart.h>
+#include "uart_i2c.h"
 
-#define I2C_DEV "I2C_0"
+
 #define DEV_ID 105
 #define CTRL1_XL 0x10
 #define CTRL2_G 0x11
@@ -43,3 +43,4 @@ void status_reg(void);
 void read_burst_data(lsm6ds33_t*);
 void print_data(lsm6ds33_t*);
 void lsm6ds33_init(void);
+#endif

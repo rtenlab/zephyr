@@ -1,12 +1,12 @@
+#ifndef LSM6DS33_H
+#define LSM6DS33_H
+
 #include <stdio.h>
 #include <zephyr.h>
 #include <sys/printk.h>
-#include <device.h>
-#include <drivers/i2c.h>
-#include <usb/usb_device.h>
-#include <drivers/uart.h>
+#include "uart_i2c.h"
 
-#define I2C_DEV "I2C_0"
+
 #define DEV_ID 105
 #define CTRL1_XL 0x10
 #define CTRL2_G 0x11
@@ -34,12 +34,11 @@ typedef struct lsm6ds33{
 		  accelZ;
 }lsm6ds33_t;
 
-void enable_uart_console(void);
-void configure_device(void);
 void check_device(void);
 void set_acc_data_rate_range(void);
 void set_gyro_data_rate_range(void);
 void status_reg(void);
 void read_burst_data(lsm6ds33_t*);
-void print_data(lsm6ds33_t*);
+void print_data_lsm(lsm6ds33_t*);
 void lsm6ds33_init(void);
+#endif

@@ -7,25 +7,18 @@
  */
 
 
-/** 
- * Cable configuration:
- * Green-cable: SDA
- * Red cable: VDD
- * Yellow cable: SCL
- * Black cable: GND
- * I2C ADDRESS FOR THE SENSOR IS 0X62
- */
+
 
 /**
- * @file: This app enables the use of SCD41 CO2 Sensor  sensor on zephyr OS.
+ * @file: This app intergrates all the sensors of Adafruit_feather_sense board on zephyr OS.
  */
 
 #include "scd41.h"
-
+#include "lsm6ds33.h"
+#include "scd41.h"
 
 void main(void){
 	//struct to store the data measured from the sensor.
-	scd41_t sensor_data;
 
 	// enabling uart_console for zephyr.
 	enable_uart_console();
@@ -33,13 +26,11 @@ void main(void){
 	// configuring the i2c device for communication with the sensor.
 	configure_device();
 
-	//print the serial id of the sensor.
 	get_serial_number();
+	check_device();
 
 	// Infinite loop to measure the data from the sensor, every 100ms. Overall latency will be 5103 ms for each loop iteration.
 	while(1){
-	measure_single_shot(&sensor_data);
-	print_data(&sensor_data);
 	delay(100);
 	}
 

@@ -1,11 +1,10 @@
+#ifndef SCD41_H
+#define SCD41_H
+
 #include<stdio.h>
 #include <zephyr.h>
 #include <sys/printk.h>
-#include <device.h>
-#include <drivers/i2c.h>
-#include <usb/usb_device.h>
-#include <drivers/uart.h>
-
+#include "uart_i2c.h"
 
 #define CRC8_POLYNOMIAL 0x31
 #define CRC8_INIT 0xFF
@@ -14,7 +13,7 @@
 #define GET_SERIAL_NUMBER 0x3682
 #define MEASURE_SINGLE_SHOT 0x219d
 #define delay(x) k_sleep(K_MSEC(x))
-#define I2C_DEV "I2C_0"
+
 
 // data structure to get the data from the sensor.										
 typedef struct data{
@@ -31,6 +30,5 @@ void get_formatted_command(uint16_t);
 void get_serial_number(void);
 void read_sensor_data(uint8_t*, int);
 void measure_single_shot(scd41_t*);
-void print_data(scd41_t*);
-void enable_uart_console(void);
-void configure_device(void);
+void print_data_scd(scd41_t*);
+#endif
