@@ -195,7 +195,6 @@ void main(void)
         //write the values into the file here
         //printk("%d ", sampleBuffer[i]); 
 
-        //We need to write the sampleBuffer values to the 
         valueBuf[399 - samples] = sampleBuffer[i]
 
 
