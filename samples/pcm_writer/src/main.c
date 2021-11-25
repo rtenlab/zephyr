@@ -238,7 +238,6 @@ void main(void)
 	rc = fs_close(&file);
 	printk("\nthe file has been closed");
 
-	
 	struct fs_dir_t dir;
 
 	fs_dir_t_init(&dir);
@@ -265,7 +264,6 @@ void main(void)
 
 	(void)fs_closedir(&dir);
 
-	
 out:
 	rc = fs_unmount(mp);
 	printk("%s unmount: %d\n", mp->mnt_point, rc);
