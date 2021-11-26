@@ -44,7 +44,7 @@ uint16_t read_status(void){
 /**
 * @FUNCTION: API to read the temperature and humidity data from SHT31 Sensor. All data is global so no input 
 */
-void read_temp_hum(temphum_t *var){
+void read_temp_hum(sht31_t *var){
 	uint8_t read_buffer[6];
 	write_command(HIGH_MEAS_CLOCK_ENABLE);
 	k_sleep(K_MSEC(50));
@@ -66,7 +66,7 @@ void read_temp_hum(temphum_t *var){
 	return;
 }
 
-void print_data_sht(temphum_t* data){
+void print_data_sht(sht31_t* data){
     printk("Temp: %d.%2d\t Humidity: %d.%2d\n",data->temp.integer, data->temp.frac, data->humidity.integer, data->humidity.frac);
     return;
 }

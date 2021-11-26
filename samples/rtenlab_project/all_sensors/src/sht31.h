@@ -38,12 +38,12 @@ typedef struct humidity{
 typedef struct temphum{
 	temperature_t temp;
 	humidity_t humidity;
-}temphum_t;
+}sht31_t;
 
 
 void write_command(uint16_t);
 uint16_t read_status(void);
-void read_temp_hum(temphum_t*);
-void print_data_sht(temphum_t*);
+void read_temp_hum(sht31_t*);
+void print_data_sht(sht31_t*);
 
 #endif
