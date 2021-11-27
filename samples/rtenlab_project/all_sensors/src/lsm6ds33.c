@@ -1,6 +1,6 @@
 #include "lsm6ds33.h"
 
-// const struct device *dev_i2c;															// Device struct to get device binding for I2C
+
 uint16_t LSM6DS_ADDR = 0x6A;															// Address of the Sensor on I2C bus as described by Adafruit website
 
 int16_t data_buffer[7];	// Buffer to hold the 16-bit data for each paramter in gyroscope and accel.
@@ -42,7 +42,7 @@ void set_gyro_data_rate_range(void){
  */
 void status_reg(void){
 	uint8_t status=0;
-	int ret = i2c_reg_read_byte(dev_i2c, LSM6DS_ADDR, STATUS_REG, &status);
+	int ret = i2c_reg_read_byte(dev_i2c, LSM6DS_ADDR, STATUS_REG_LSM, &status);
 	if(ret!=0)
 		printk("Error reading the status of the register\n");
 	printk("Status: %d\n", status);

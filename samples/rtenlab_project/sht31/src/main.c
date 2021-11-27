@@ -17,7 +17,7 @@
 #include "uart_i2c.h"
 
 void main(void){
-	temphum_t variable;
+	sht31_t variable;
 	enable_uart_console();
 	configure_device();
 	

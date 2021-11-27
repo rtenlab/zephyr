@@ -1,7 +1,6 @@
 #include "scd41.h"
  
-// const struct device *dev_i2c; 
-      // Device struct to get device binding for I2C
+
 uint16_t SCD41_ADDR = 0x62;		// Address of the Sensor on I2C bus as described by Adafruit website
 uint8_t command_to_sensor[NUM_BYTES_TO_SENSOR];
 

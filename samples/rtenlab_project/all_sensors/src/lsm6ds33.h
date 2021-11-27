@@ -10,7 +10,7 @@
 #define DEV_ID 105
 #define CTRL1_XL 0x10
 #define CTRL2_G 0x11
-#define STATUS_REG 0x1E
+#define STATUS_REG_LSM 0x1E
 #define OUT_TEMP_L 0x20
 #define OUT_TMP_H 0x21
 #define delay(x) k_sleep(K_MSEC(x))

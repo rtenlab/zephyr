@@ -11,7 +11,7 @@
 #define mask(x) (1<<x)																				// Macro for masking bits.
 
 
-#define STATUS_REG 0xF32D
+#define STATUS_REG_SHT 0xF32D
 #define ENABLE_HEATER 0x306D
 #define SOFT_RESET 0x30A2
 #define HIGH_MEAS_CLOCK_ENABLE 0x2C06
@@ -25,22 +25,14 @@
 
 
 // Struct to hold the integer and fractional information of temperature and humidity.
-typedef struct temperature{
-	int32_t integer;
-	uint8_t frac;	
-}temperature_t;
-
-typedef struct humidity{
-	uint32_t integer;
-	uint8_t frac;
-}humidity_t;
-
 typedef struct temphum{
-	temperature_t temp;
-	humidity_t humidity;
+	float temp;
+	float humidity;
 }sht31_t;
 
 
+void enable_uart_console(void);
+void configure_device(void);
 void write_command(uint16_t);
 uint16_t read_status(void);
 void read_temp_hum(sht31_t*);

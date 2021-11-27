@@ -25,27 +25,17 @@
 
 
 // Struct to hold the integer and fractional information of temperature and humidity.
-typedef struct temperature{
-	int32_t integer;
-	uint8_t frac;	
-}temperature_t;
-
-typedef struct humidity{
-	uint32_t integer;
-	uint8_t frac;
-}humidity_t;
-
 typedef struct temphum{
-	temperature_t temp;
-	humidity_t humidity;
-}temphum_t;
+	float temp;
+	float humidity;
+}sht31_t;
 
 
 void enable_uart_console(void);
 void configure_device(void);
 void write_command(uint16_t);
 uint16_t read_status(void);
-void read_temp_hum(temphum_t*);
-void print_data(temphum_t*);
+void read_temp_hum(sht31_t*);
+void print_data_sht(sht31_t*);
 
 #endif
