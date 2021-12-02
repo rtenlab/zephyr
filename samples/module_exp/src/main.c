@@ -11,6 +11,17 @@
 #include <usb/usb_device.h>
 #include <drivers/uart.h>
 
+#include <stdlib.h>
+#include <arm_math.h>
+#include <arm_const_structs.h>
+
+#define FFT_SAMPLES 1024
+#define FFT_SAMPLES_HALF (FFT_SAMPLES / 2)
+
+static float32_t complexFFT[FFT_SAMPLES], realFFT[FFT_SAMPLES_HALF],
+		imagFFT[FFT_SAMPLES_HALF], angleFFT[FFT_SAMPLES_HALF],
+		powerFFT[FFT_SAMPLES_HALF];
+		
 void main(void)
 {
 	const struct device *dev = device_get_binding(
@@ -34,9 +45,7 @@ void main(void)
 
 		return;
 	}
-
-	while (1) {
-		printk("Hello World! %s\n", CONFIG_ARCH);
-		k_sleep(K_SECONDS(1));
+	while(1){
+		printk("Hello\n");
 	}
 }
