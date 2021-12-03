@@ -11,7 +11,13 @@
 #include <usb/usb_device.h>
 #include <drivers/uart.h>
 
+// For the Speakers you see
 #include <audio/dmic.h>
+
+// For the FFT
+#include <stdlib.h>
+#include <arm_math.h>
+#include <arm_const_structs.h>
 
 #define AUDIO_FREQ		16000
 #define CHAN_SIZE		16
@@ -195,25 +201,22 @@ void main(void)
         //write the values into the file here
         //printk("%d ", sampleBuffer[i]); 
 
-        valueBuf[399 - samples] = sampleBuffer[i]
-
+        valueBuf[399 - samples] = sampleBuffer[i];
 
         //if ((i % 16) == 0) printk("\n"); This is the original
 
         if ((i % 16) == 0) {
-          printk("\n");
+          // printk("\n");
           ret = dmic_trigger(mic_dev, DMIC_TRIGGER_STOP);
           if (ret < 0) {
             printk("microphone stop trigger error\n");
             continue;
             }
           }
-
-
       }
       // clear the read count
       samplesRead = 0;
-      printk("\nmic: %d\n", maxwave - minwave);
+      printk("mic: %d\n", maxwave - minwave);
     }
     //printk("\nmic: %d\n", maxwave - minwave);
     
