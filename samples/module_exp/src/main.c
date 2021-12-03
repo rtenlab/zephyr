@@ -383,11 +383,13 @@ void main(void)
 	}
 	
 	//Add the code to test DSP transform
+
+	printk("Begin FFT Ops\n");
 	status = ARM_MATH_SUCCESS;
 	status = arm_rfft_fast_init_f32(&S, fftSize);
 	printk("The FFT has been initialized\n");
 	arm_rfft_fast_f32(&S, inputSignal, complexFFT, ifftFlag);
-	printk("FFT has been completed");
+	printk("FFT has been completed\n");
 	float32_t DCoffset = complexFFT[0];
 
 	for (i = 0; i < (FFT_SAMPLES / 2) - 1; i++) {
@@ -409,6 +411,10 @@ void main(void)
 
 	arm_max_f32(&powerFFT[1], FFT_SAMPLES_HALF - 1, &maxValue, &maxIndex);
 	// correct index
+
+	printk("Real Test: %f, Imag Test: %f\n", complexFFT[3], complexFFT[4]);
+	printk("Power Test: %f\n", powerFFT[4]);
+	
 	maxIndex += 1;
 	
 }
