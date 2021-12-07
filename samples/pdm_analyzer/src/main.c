@@ -78,8 +78,23 @@ static inline short max(short a, short b)
   return a;
 }
 
-//This is the buffer that holds the samples
-int valueBuf[400];
+// This is the buffer that holds the samples
+#define FFT_SAMPLES 400
+#define FFT_SAMPLES_HALF (FFT_SAMPLES/2)
+static float32_t inputSignal[FFT_SAMPLES];
+
+// This is for the FFT
+static float32_t complexFFT[FFT_SAMPLES], realFFT[FFT_SAMPLES_HALF],
+		imagFFT[FFT_SAMPLES_HALF], angleFFT[FFT_SAMPLES_HALF],
+		powerFFT[FFT_SAMPLES_HALF];
+
+uint32_t fftSize = FFT_SAMPLES;
+uint32_t ifftFlag = 0;
+arm_rfft_fast_instance_f32 S;
+uint32_t maxIndex = 0;
+arm_status status;
+float32_t maxValue;
+int i;
 
 void main(void)
 {
@@ -201,7 +216,7 @@ void main(void)
         //write the values into the file here
         //printk("%d ", sampleBuffer[i]); 
 
-        valueBuf[399 - samples] = sampleBuffer[i];
+        inputSignal[399 - samples] = (float32_t)sampleBuffer[i];
 
         //if ((i % 16) == 0) printk("\n"); This is the original
 
@@ -216,10 +231,44 @@ void main(void)
       }
       // clear the read count
       samplesRead = 0;
-      printk("mic: %d\n", maxwave - minwave);
+      // printk("mic: %d\n", maxwave - minwave);
     }
     //printk("\nmic: %d\n", maxwave - minwave);
+
+    // Include the FFT here
+    printk("Begin FFT Ops\n");
+    status = ARM_MATH_SUCCESS;
+    status = arm_rfft_fast_init_f32(&S, fftSize);
+    printk("The FFT has been initialized\n");
+    arm_rfft_fast_f32(&S, inputSignal, complexFFT, ifftFlag);
+    printk("FFT has been completed\n");
+    float32_t DCoffset = complexFFT[0];
+
+    for (i = 0; i < (FFT_SAMPLES / 2) - 1; i++) {
+      realFFT[i] = complexFFT[i * 2];
+      imagFFT[i] = complexFFT[(i * 2) + 1];
+    }
+
+    printk("The complex numbers have been made\n");
     
+    for (i = 0; i < FFT_SAMPLES / 2; i++) {
+      angleFFT[i] = atan2f(imagFFT[i], realFFT[i]);
+    }
+
+    printk("Phase Responses has been constructed\n");
+
+    arm_cmplx_mag_squared_f32(complexFFT, powerFFT, FFT_SAMPLES_HALF);
+
+    printk("Power Spectrum has been contructed\n");
+
+    arm_max_f32(&powerFFT[1], FFT_SAMPLES_HALF - 1, &maxValue, &maxIndex);
+    // correct index
+
+    printk("Real Test: %f, Imag Test: %f\n", complexFFT[3], complexFFT[4]);
+    printk("Power Test: %f\n", powerFFT[4]);
+    
+    maxIndex += 1;
+
     k_sleep(K_MSEC(300));
   }
 #endif
