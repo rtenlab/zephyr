@@ -20,7 +20,6 @@
 
 //#define FFT_SAMPLES 400
 #define FFT_SAMPLES_HALF (FFT_SAMPLES / 2)
-
 /*
 extern float32_t inputSignal[FFT_SAMPLES] = { 2, 1.80075512683121,
 		1.27637053325758, 0.618871900194794, 0.0656112591359919,
@@ -412,16 +411,17 @@ void main(void)
 
 	printk("Phase Responses has been constructed\n");
 
-  	arm_cmplx_mag_squared_f32(complexFFT, powerFFT, FFT_SAMPLES_HALF);
+  	arm_cmplx_mag_f32(complexFFT, powerFFT, FFT_SAMPLES_HALF);
 
 	printk("Power Spectrum has been contructed\n");
+
+	for(int i = 0; i < FFT_SAMPLES_HALF; i++){
+		printk("%d)Real: %f Imag: %f power: %f\n", i, realFFT[i], imagFFT[i], powerFFT[i]);
+	}
 
 	arm_max_f32(&powerFFT[1], FFT_SAMPLES_HALF - 1, &maxValue, &maxIndex);
 	// correct index
 
-	printk("Real Test: %f, Imag Test: %f\n", complexFFT[3], complexFFT[4]);
-	printk("Power Test: %f\n", powerFFT[4]);
-	
 	maxIndex += 1;
 	
 }

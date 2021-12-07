@@ -262,21 +262,20 @@ void main(void)
 
       printk("Phase Responses has been constructed\n");
 
-      arm_cmplx_mag_squared_f32(complexFFT, powerFFT, FFT_SAMPLES_HALF);
+      arm_cmplx_mag_f32(complexFFT, powerFFT, FFT_SAMPLES_HALF);
 
       printk("Power Spectrum has been contructed\n");
 
       arm_max_f32(&powerFFT[1], FFT_SAMPLES_HALF - 1, &maxValue, &maxIndex);
       // correct index
 
-      printk("Real Test: %f, Imag Test: %f\n", complexFFT[3], complexFFT[4]);
-      printk("Power Test: %f\n", powerFFT[4]);
+      // A simple filter will not work, we going to have to check mean of the filter
       
       maxIndex += 1;
     }
     else {
       delayCount++;
-      printf("Delay Count : %d\n", delayCount);
+      printk("Delay Count : %d\n", delayCount);
     }
 
     k_sleep(K_MSEC(300));
