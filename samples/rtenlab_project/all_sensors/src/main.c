@@ -17,7 +17,7 @@
 
 
 
-//#define FIRE_SCD
+#define FIRE_SCD
 #define FIRE_SHT
 #define FIRE_LSM
 #define FIRE_APDS
@@ -92,19 +92,19 @@ void main(void){
 	while(1){
 	#ifdef FIRE_SCD
 		scd41_fire(&scd41_sensor_data);
-		delay(100);
+		// delay(100);
 	#endif
 	#ifdef FIRE_SHT
 		sht31_fire(&sht31_sensor_data);
-		delay(50);
+		// delay(50);
 	#endif
 	#ifdef FIRE_LSM
 		lsm6ds33_fire(&lsm6ds33_sensor_data);
-		delay(50);
+		// delay(50);
 	#endif
 	#ifdef FIRE_APDS
 		apds9960_fire(&apds9960_sensor_data);
-		delay(50);
+		delay(1000);
 	#endif
 	}
 
