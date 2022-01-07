@@ -1,6 +1,9 @@
 #right your most recent used here
 nothing:
-	./make.sh all_sensors
+	./make.sh synchronization_dev_implementation
+	./flash.sh
+sync:
+	./make.sh synchronization_dev_implementation
 	./flash.sh
 all:
 	./make.sh all_sensors

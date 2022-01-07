@@ -138,6 +138,16 @@ static struct bt_conn_cb conn_callbacks = {
 void main(void)
 {
 	int err;
+	const struct device  *dev_usb;																										// Device for USB Console.
+	uint32_t dtr=0;
+	
+
+	dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+	if(usb_enable(NULL))
+		return;
+	
+	while(!dtr)
+		uart_line_ctrl_get(dev_usb,UART_LINE_CTRL_DTR, &dtr);	
 
 	err = bt_enable(NULL);
 	if (err) {
@@ -150,13 +160,7 @@ void main(void)
 	bt_conn_cb_register(&conn_callbacks);
 
 	start_scan();
-	const struct device *dev = device_get_binding(
-                        CONFIG_UART_CONSOLE_ON_DEV_NAME);
-        uint32_t dtr = 0;
-
-        if (usb_enable(NULL)) {
-                return;
-        }
+	
 if (strlen(CONFIG_UART_CONSOLE_ON_DEV_NAME) !=
             strlen("CDC_ACM_0") ||
             strncmp(CONFIG_UART_CONSOLE_ON_DEV_NAME, "CDC_ACM_0",

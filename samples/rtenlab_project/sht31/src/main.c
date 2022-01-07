@@ -23,7 +23,7 @@ void main(void){
 	
 	while(true){
 		read_temp_hum(&variable);
-		print_data(&variable);
+		print_data_sht(&variable);
 		delay(10);
 	}
 	return;

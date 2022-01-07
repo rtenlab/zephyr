@@ -39,7 +39,7 @@ void main(void){
 	// Infinite loop to measure the data from the sensor, every 100ms. Overall latency will be 5103 ms for each loop iteration.
 	while(1){
 	measure_single_shot(&sensor_data);
-	print_data(&sensor_data);
+	print_data_scd(&sensor_data);
 	delay(100);
 	}
 
