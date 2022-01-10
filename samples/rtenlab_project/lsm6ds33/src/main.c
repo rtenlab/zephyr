@@ -17,14 +17,14 @@
 
 
 void main(void){
-	lsm6ds33_t all_data;
+	lsm6ds33_t lsm6ds33_sensor_data;
 	// enabling uart_console for zephyr.
 	enable_uart_console();
 
 	// configuring the i2c device for communication with the sensor.
 	configure_device();
 
-	// check if we have the sensor we want.
+	// check if we have t he sensor we want.
 	check_device();
 
 	// Initialize the sensor by setting necessary parameters for gyroscope and accelerometer
@@ -35,8 +35,8 @@ void main(void){
 
 	while(1){
 		delay(90);
-		read_burst_data(&all_data);
-		print_data(&all_data);
+		read_burst_data(&lsm6ds33_sensor_data);
+		print_data(&lsm6ds33_sensor_data);
 	}
 
 		

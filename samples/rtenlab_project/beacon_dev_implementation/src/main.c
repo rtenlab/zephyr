@@ -27,7 +27,10 @@
 static const struct bt_data ad[] = {
 		BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR),
 		// BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0xaa, 0xfe),
-	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0x32)
+		BT_DATA_BYTES(BT_DATA_TX_POWER),
+	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0xFF),
+	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0x33),
+	
 		    //   0xaa, 0xfe, /* Eddystone UUID */
 		    //   0x10, /* Eddystone-URL frame type */
 		    //   0x00, /* Calibrated Tx power at 0m */
@@ -40,6 +43,7 @@ static const struct bt_data ad[] = {
 /* Set Scan Response data */
 static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
+	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0x34),
 };
 
 static void bt_ready(int err)
@@ -56,6 +60,7 @@ static void bt_ready(int err)
 	printk("Bluetooth initialized\n");
 
 	/* Start advertising */
+	/* change this to BT_LE_ADV_CONN to be able to establish connection. Need to write some additional code to actually connect to the data.*/
 	err = bt_le_adv_start(BT_LE_ADV_NCONN_IDENTITY, ad, ARRAY_SIZE(ad),
 			      sd, ARRAY_SIZE(sd));
 	if (err) {

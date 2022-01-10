@@ -6,7 +6,6 @@
 #include <sys/printk.h>
 
 #define mask(x) (1<<x)									// Macro for masking bits.
-#define delay(x)    k_sleep(K_MSEC(x))
 
 #define APDS_ADDR 0x39
 #define APDS_PDATA 0x9c

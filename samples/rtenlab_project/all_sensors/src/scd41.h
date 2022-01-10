@@ -12,7 +12,7 @@
 #define READ_MEASUREMENT 0xec05
 #define GET_SERIAL_NUMBER 0x3682
 #define MEASURE_SINGLE_SHOT 0x219d
-#define delay(x) k_sleep(K_MSEC(x))
+
 
 
 // data structure to get the data from the sensor.										

@@ -13,7 +13,6 @@
 #define STATUS_REG_LSM 0x1E
 #define OUT_TEMP_L 0x20
 #define OUT_TMP_H 0x21
-#define delay(x) k_sleep(K_MSEC(x))
 
 #define ACC_104_HZ_4G 0x28		// Set gyroscope data rate to 104HZ
 #define GYRO_104_HZ_1000dps 0x28	// Set Accel. data rate to 104HZ
