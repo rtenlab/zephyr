@@ -20,7 +20,6 @@
 #define HIGH_MEAS_CLOCK_DIS 0X2400
 #define MED_MEAS_CLOCK_DIS 0x240B
 #define LOW_MEAS_CLOCK_DIS 0x2416
-#define delay(x) k_sleep(K_MSEC(x))
 
 
 

@@ -7,6 +7,8 @@
 #include <drivers/uart.h>
 #define I2C_DEV "I2C_0"
 
+#define delay(x)    k_sleep(K_MSEC(x))
+
 extern const struct device *dev_i2c;
 
 void enable_uart_console(void);

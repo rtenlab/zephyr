@@ -1,6 +1,8 @@
 #right your most recent used here
-nothing:
-	./make.sh synchronization_dev_implementation
+nothing:bt
+
+bt:
+	./make.sh beacon_dev_implementation
 	./flash.sh
 sync:
 	./make.sh synchronization_dev_implementation
