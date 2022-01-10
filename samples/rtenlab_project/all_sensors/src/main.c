@@ -21,6 +21,7 @@
 #define FIRE_SHT
 #define FIRE_LSM
 #define FIRE_APDS
+#define FIRE_BMP
 
 #ifdef FIRE_APDS
 #include "apds9960.h"
@@ -59,6 +60,15 @@ void lsm6ds33_fire(lsm6ds33_t* lsm6ds33_data){
 	print_data_lsm(lsm6ds33_data);
 }
 #endif
+
+#ifdef FIRE_BMP
+#include "bmp280.h"
+void bmp280_fire(bmp280_t* bmp280_data){
+	
+	bmp_read_press_temp_data(bmp280_data);
+	print_data_bmp(bmp280_data);
+}
+#endif
 void main(void){
 	// enabling uart_console for zephyr.
 	enable_uart_console();
@@ -86,7 +96,10 @@ void main(void){
 	enable_apds_sensor();
 	#endif
 
-	
+	#ifdef FIRE_BMP
+	bmp280_t bmp280_sensor_data;
+	read_calibration_registers();
+	#endif
 	
 	// Infinite loop to measure the data from the sensor, every 100ms. Overall latency will be 5103 ms for each loop iteration.
 	while(1){
@@ -105,6 +118,10 @@ void main(void){
 	#ifdef FIRE_APDS
 		apds9960_fire(&apds9960_sensor_data);
 		delay(1000);
+	#endif
+	#ifdef FIRE_BMP
+		bmp280_fire(&bmp280_sensor_data);
+		delay(100);
 	#endif
 	}
 

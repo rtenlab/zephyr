@@ -59,11 +59,9 @@ void main(void){
 	}
 	
 	while(1){
-	  
 	delay(500);
-	bmp280_sensor_data.temperature = read_temperature();							
-	bmp280_sensor_data.pressure = read_pressure();	
-	printk("Tempreature data: %f\t Pressure: %f\n",bmp280_sensor_data.temperature,bmp280_sensor_data.pressure); 
+	bmp_read_press_temp_data(&bmp280_sensor_data);
+	print_data_bmp(&bmp280_sensor_data);
 	}
   return;
 }
