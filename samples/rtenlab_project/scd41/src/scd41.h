@@ -30,7 +30,7 @@ void get_formatted_command(uint16_t);
 void get_serial_number(void);
 void read_sensor_data(uint8_t*, int);
 void measure_single_shot(scd41_t*);
-void print_data(scd41_t*);
+void print_data_scd(scd41_t*);
 void enable_uart_console(void);
 void configure_device(void);
 #endif

@@ -154,6 +154,7 @@ void main(void)
 	lsm6ds33_init();
 	enable_apds_sensor();
 	k_mutex_init(&mymutex);
+	printk("Number of CPUS: %d\n", CONFIG_MP_NUM_CPUS);
 	k_thread_create(&sht31_data, sht31_stack_area,
 			K_THREAD_STACK_SIZEOF(sht31_stack_area),
 			sht31, NULL, NULL, NULL,

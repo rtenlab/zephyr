@@ -35,7 +35,7 @@ config BUILD_OUTPUT_HEX
 
 if !CORTEX_M_DWT && NRF_RTC_TIMER
 config SOC_HAS_TIMING_FUNCTIONS
-	default y
+	default y 
 endif
 
 config GPIO

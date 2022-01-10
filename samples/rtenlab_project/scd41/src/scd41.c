@@ -111,7 +111,7 @@ void measure_single_shot(scd41_t* data){
 /**
  * FUNCTION: function to print the data obtained from the sensor.
  */
-void print_data(scd41_t* data){
+void print_data_scd(scd41_t* data){
     	printf("CO2:%d\t Hum:%f\t Temp: %f\n", data->Co2, data->hum, data->temp);
 	return;
 }

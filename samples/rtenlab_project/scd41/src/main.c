@@ -21,11 +21,16 @@
  */
 
 #include "scd41.h"
+#include <timing/timing.h>
 
 
 void main(void){
 	//struct to store the data measured from the sensor.
 	scd41_t sensor_data;
+	timing_t start_time, stop_time;
+	uint64_t total_cycles;
+	uint64_t total_ns;
+
 
 	// enabling uart_console for zephyr.
 	enable_uart_console();
@@ -38,7 +43,15 @@ void main(void){
 
 	// Infinite loop to measure the data from the sensor, every 100ms. Overall latency will be 5103 ms for each loop iteration.
 	while(1){
+	soc_timing_init();
+	soc_timing_start();
+	start_time = timing_counter_get();
 	measure_single_shot(&sensor_data);
+	stop_time = soc_timing_counter_get();
+	total_cycles = soc_timing_cycles_get(&start_time, &stop_time);
+	total_ns = soc_timing_cycles_to_ns(total_cycles);
+	printf("Timing to get the measure single shot: %lld ns\n", total_ns);
+	soc_timing_stop();
 	print_data_scd(&sensor_data);
 	delay(100);
 	}
