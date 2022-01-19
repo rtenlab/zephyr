@@ -1,6 +1,9 @@
 #right your most recent used here
-nothing:bt
+nothing:central
 
+central: 
+	./make.sh central
+	./flash.sh
 bt:
 	./make.sh beacon_dev_implementation
 	./flash.sh

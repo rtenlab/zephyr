@@ -15,6 +15,9 @@
 #include <bluetooth/hci.h>
 #include <bluetooth/gap.h>
 
+#include "uart_i2c.h"
+#include "sht31.h"
+
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
 
@@ -28,23 +31,19 @@ static const struct bt_data ad[] = {
 		BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR),
 		// BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0xaa, 0xfe),
 		BT_DATA_BYTES(BT_DATA_TX_POWER),
-	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0xFF),
-	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0x33),
-	
-		    //   0xaa, 0xfe, /* Eddystone UUID */
-		    //   0x10, /* Eddystone-URL frame type */
-		    //   0x00, /* Calibrated Tx power at 0m */
-		    //   0x00, /* URL Scheme Prefix http://www. */
-		    //   'z', 'e', 'p', 'h', 'y', 'r',
-		    //   'p', 'r', 'o', 'j', 'e', 'c', 't',
-		    //   0x08) /* .org */
+		BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0xFF),
+		BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0x33),
 };
 
 /* Set Scan Response data */
-static const struct bt_data sd[] = {
-	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
-	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, 0x34),
-};
+// static 
+static sht31_t something;
+
+void write(sht31_t* something_local){
+	something.temp = something_local->temp;
+	something.humidity = something_local->humidity;
+	return;
+}
 
 static void bt_ready(int err)
 {
@@ -56,6 +55,11 @@ static void bt_ready(int err)
 		printk("Bluetooth init failed (err %d)\n", err);
 		return;
 	}
+	struct bt_data sd[] = {
+	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
+	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, something.temp),
+	BT_DATA_BYTES(BT_GAP_DATA_LEN_MAX, something.humidity),
+};
 
 	printk("Bluetooth initialized\n");
 
@@ -83,13 +87,23 @@ static void bt_ready(int err)
 
 void main(void)
 {
+	sht31_t sht31_sensor_data;
 	int err;
-
+	enable_uart_console();
+	configure_device();
 	printk("Starting Beacon Demo\n");
 
 	/* Initialize the Bluetooth Subsystem */
+	while(1){
+		read_temp_hum(&sht31_sensor_data);
+		write(&sht31_sensor_data);
+		print_data_sht(&sht31_sensor_data);
+		delay(100);
 	err = bt_enable(bt_ready);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 	}
+	}
+
+	
 }
