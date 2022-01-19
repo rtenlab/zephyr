@@ -3,6 +3,10 @@ nothing:central
 
 central: 
 	./make.sh central
+nothing:blink
+
+blink:
+	./make.sh blinky
 	./flash.sh
 bt:
 	./make.sh beacon_dev_implementation
