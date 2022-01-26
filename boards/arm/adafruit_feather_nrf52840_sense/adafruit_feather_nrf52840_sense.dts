@@ -34,6 +34,11 @@
 			gpios = <&gpio1 10 0>;
 			label = "Blue LED";
 		};
+		led2: led_2 {
+			gpios = <&gpio1 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Custom LED";
+		};
+
 	};
 
 	buttons {
@@ -42,6 +47,10 @@
 			gpios = <&gpio1 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 			label = "Push button switch";
 		};
+		button1: button_1{
+			gpios = <&gpio0 7 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Custom button switch";
+		};
 	};
 
 	/* These aliases are provided for compatibility with samples */
@@ -49,6 +58,8 @@
 		led0 = &led0;
 		led1 = &led1;
 		sw0 = &button0;
+		sw1 = &button1;
+		led2 = &led2;
 	};
 };
 

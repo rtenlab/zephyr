@@ -1,10 +1,9 @@
 #right your most recent used here
-nothing:central
+nothing:button
 
-central: 
-	./make.sh central
-nothing:blink
-
+button:
+	./make.sh button
+	./flash.sh
 blink:
 	./make.sh blinky
 	./flash.sh
