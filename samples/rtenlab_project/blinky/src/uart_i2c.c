@@ -1,6 +1,7 @@
 #include "uart_i2c.h"
 #define I2C_DEV "I2C_0"
 
+
 /**
 *@FUNCTION: API to configure the uart console for printk statements.
 */
