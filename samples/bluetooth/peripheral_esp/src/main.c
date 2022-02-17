@@ -21,6 +21,9 @@
 #include <bluetooth/uuid.h>
 #include <bluetooth/gatt.h>
 #include <bluetooth/services/bas.h>
+#include <usb/usb_device.h>
+
+#include "uart_i2c.h"
 
 #define SENSOR_1_NAME				"Temperature Sensor 1"
 #define SENSOR_2_NAME				"Temperature Sensor 2"
@@ -380,29 +383,29 @@ static void bt_ready(void)
 	printk("Advertising successfully started\n");
 }
 
-static void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
+// static void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
+// {
+// 	char addr[BT_ADDR_LE_STR_LEN];
 
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+// 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	printk("Passkey for %s: %06u\n", addr, passkey);
-}
+// 	printk("Passkey for %s: %06u\n", addr, passkey);
+// }
 
-static void auth_cancel(struct bt_conn *conn)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
+// static void auth_cancel(struct bt_conn *conn)
+// {
+// 	char addr[BT_ADDR_LE_STR_LEN];
 
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+// 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	printk("Pairing cancelled: %s\n", addr);
-}
+// 	printk("Pairing cancelled: %s\n", addr);
+// }
 
-static struct bt_conn_auth_cb auth_cb_display = {
-	.passkey_display = auth_passkey_display,
-	.passkey_entry = NULL,
-	.cancel = auth_cancel,
-};
+// static struct bt_conn_auth_cb auth_cb_display = {
+	// // .passkey_display = auth_passkey_display,
+	// // .passkey_entry = NULL,
+// 	// .cancel = auth_cancel,
+// };
 
 static void bas_notify(void)
 {
@@ -420,7 +423,7 @@ static void bas_notify(void)
 void main(void)
 {
 	int err;
-
+	// enable_uart_console();
 	err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
@@ -430,7 +433,7 @@ void main(void)
 	bt_ready();
 
 	bt_conn_cb_register(&conn_callbacks);
-	bt_conn_auth_cb_register(&auth_cb_display);
+	// bt_conn_auth_cb_register(&auth_cb_display);
 
 	while (1) {
 		k_sleep(K_SECONDS(1));

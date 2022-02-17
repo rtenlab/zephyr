@@ -1,6 +1,9 @@
 #right your most recent used here
 nothing:button
 
+per:
+	./make.sh ble_conn
+	./flash.sh
 button:
 	./make.sh button
 	./flash.sh
