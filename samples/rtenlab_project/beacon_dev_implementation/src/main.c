@@ -48,7 +48,7 @@ const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR),
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0x6e, 0x2a),
 	BT_DATA_BYTES(BT_DATA_SVC_DATA16, 0x6e, 0x2a,
-					0x00,
+					0xFF,
 					0x00),
 };
 struct bt_data sd[] = {
@@ -60,8 +60,8 @@ const struct bt_data new_ad[]={
 		BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR),
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0x6e, 0x2a),
 	BT_DATA_BYTES(BT_DATA_SVC_DATA16, 0x6e, 0x2a,
-					0xFF,
-					0x00),	
+					0x2A,
+					0x0A),	
 };
 
 static void bt_ready(int err)
@@ -105,7 +105,7 @@ void main(void)
 {
 	sht31_t sht31_sensor_data;
 	int err;
-	enable_uart_console();
+	// enable_uart_console();
 	configure_device();
 	printk("Starting Beacon Demo\n");
 	read_temp_hum(&sht31_sensor_data);

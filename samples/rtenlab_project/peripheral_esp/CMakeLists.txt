@@ -6,8 +6,6 @@ project(peripheral_esp)
 
 target_sources(app PRIVATE
   src/main.c
-  src/uart_i2c.c
-  src/sht31.c
 )
 
 zephyr_library_include_directories(${ZEPHYR_BASE}/samples/bluetooth)

@@ -20,10 +20,14 @@ void main(void){
 	sht31_t variable;
 	enable_uart_console();
 	configure_device();
-	
+	uint8_t temp[2];
 	while(true){
 		read_temp_hum(&variable);
 		print_data_sht(&variable);
+		temp[0] = (uint8_t)variable.temp;
+		temp[1] = (uint8_t)((variable.temp-temp[0])*100);
+		printk("UINT8_T TEMP[0]: %d\n", temp[0]);
+		printk("UINT8_T TEMP[1]: %d\n", temp[1]);
 		delay(10);
 	}
 	return;
