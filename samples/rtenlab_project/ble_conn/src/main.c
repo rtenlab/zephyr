@@ -51,13 +51,13 @@ static void hum_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 }
 
 BT_GATT_SERVICE_DEFINE(ess_svc,
-	BT_GATT_PRIMARY_SERVICE(BT_UUID_ESS),
+	// BT_GATT_PRIMARY_SERVICE(BT_UUID_ESS),
 	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
-			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 	BT_GATT_CHARACTERISTIC(BT_UUID_HUMIDITY, BT_GATT_CHRC_NOTIFY,
-					BT_GATT_PERM_NONE, NULL, NULL, NULL),
+					BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hum_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),					
 	
@@ -86,12 +86,8 @@ void ess_notify(void)
     // uint8_t temp;
     int16_t temp_value;
 	read_temp_hum(&sensor_value);
-    temp_value = (uint16_t)((sensor_value.humidity)*100);
+    temp_value = (uint16_t)((sensor_value.temp)*100);
 	// hum_value = (uint16_t)((sensor_value.humidity)*100);
-    // temp = (uint8_t)sensor_value.temp;
-    // temp[0] = (uint8_t)((sensor_value.temp-temp[1])*100);
-    // temp[0] = (uint8_t)((value     ) & 0xFF);
-    // temp[1] = (uint8_t)((value >> 8) & 0xFF);
     bt_gatt_notify(NULL, &ess_svc.attrs[1], &temp_value, sizeof(temp_value));
 	humidity_notify();
 	// bt_gatt_notify(NULL, &ess_svc.attrs[3], &hum_value, sizeof(hum_value));
@@ -101,8 +97,7 @@ static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA_BYTES(BT_DATA_GAP_APPEARANCE, 0x00, 0x03),
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL,
-		      BT_UUID_16_ENCODE(BT_UUID_ESS_VAL),
-		      BT_UUID_16_ENCODE(BT_UUID_BAS_VAL)),
+		      BT_UUID_16_ENCODE(BT_UUID_ESS_VAL)),
 };
 
 static void connected(struct bt_conn *conn, uint8_t err)
