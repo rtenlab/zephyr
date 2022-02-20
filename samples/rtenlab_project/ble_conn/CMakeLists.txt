@@ -8,6 +8,9 @@ target_sources(app PRIVATE
   src/main.c
   src/uart_i2c.c
   src/sht31.c
+  src/apds9960.c
+  src/bmp280.c
+  src/lsm6ds33.c
 )
 
 zephyr_library_include_directories(${ZEPHYR_BASE}/samples/bluetooth)
