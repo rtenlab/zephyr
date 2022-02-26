@@ -1,4 +1,4 @@
-#include "uart_i2c.h"
+#include "../uart_i2c.h"
 #include "apds9960.h"
 
 // const struct device *dev_i2c;

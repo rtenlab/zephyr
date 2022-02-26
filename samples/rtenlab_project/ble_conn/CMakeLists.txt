@@ -7,10 +7,13 @@ project(peripheral_esp)
 target_sources(app PRIVATE
   src/main.c
   src/uart_i2c.c
-  src/sht31.c
-  src/apds9960.c
-  src/bmp280.c
-  src/lsm6ds33.c
+  src/sht/sht31.c
+  src/apds/apds9960.c
+  src/bmp/bmp280.c
+  src/lsm/lsm6ds33.c
+  src/scd/scd41.c
+  src/ds/Onewire.c
+  src/ds/Dallas_temperature.c
 )
 
 zephyr_library_include_directories(${ZEPHYR_BASE}/samples/bluetooth)

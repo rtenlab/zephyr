@@ -23,15 +23,20 @@
 #include <usb/usb_device.h>
 
 #include "uart_i2c.h"
-#include "sht31.h"
-#include "apds9960.h"
-#include "bmp280.h"
-#include "lsm6ds33.h"
+#include "sht/sht31.h"
+#include "apds/apds9960.h"
+#include "bmp/bmp280.h"
+#include "lsm/lsm6ds33.h"
+#include "scd/scd41.h"
+#include "ds/Onewire.h"
+#include "ds/Dallas_temperature.h"
 
 #define SHT31
 #define APDS9960
 #define BMP280
 #define LSM6DS33
+#define SCD41
+#define DS18B20
 
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
@@ -45,69 +50,47 @@
 #define CPF_UNIT_ANG_VEL	0x2743
 
 #ifdef SHT31
-/**
-Custom UUID we are going to use for our primary service
-	57812a99-9146-4e72-a4b7-5159632dee90
-*/
+
+// @brief 57812a99-9146-4e72-a4b7-5159632dee90
 static struct bt_uuid_128 sht_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0x57812a99, 0x9146, 0x4e72, 0Xa4b7,  0X5159632dee90));
 
 #endif
 
 #ifdef APDS9960
-/**
- * @brief  UUID for apds sensor data: ebcc60b7-974c-43e1-a973-426e79f9bc6c 
- * @retval Formatted UUID value from the above string.
- */
 
+// @brief  UUID for apds sensor data: ebcc60b7-974c-43e1-a973-426e79f9bc6c 
 static struct bt_uuid_128 apds_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0xebcc60b7, 0x974c, 0x43e1, 0Xa973,  0X426e79f9bc6c));
 
-/**
- * @brief  UUID for apds sensor data: 1441e94a-74bc-4412-b45b-f1d91487afe5
- * @retval Formatted UUID value from the above string.
- */
+
+//  @brief  UUID for apds sensor data: 1441e94a-74bc-4412-b45b-f1d91487afe5
 static struct bt_uuid_128 apds_prox_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0x1441e94a, 0x74bc, 0x4412, 0Xb45b,  0X4f1d91487afe5));
 
-/**
- * @brief  UUID for red_als apds sensor data: 3c321537-4b8e-4662-93f9-cb7df0e437c5
- * @retval 
- */
+
+//  @brief  UUID for red_als apds sensor data: 3c321537-4b8e-4662-93f9-cb7df0e437c5
 static struct bt_uuid_128 apds_als_red_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0x3c321537, 0x4b8e, 0x4662, 0x93f9, 0xcb7df0e437c5));
 
-/**
- * @brief  UUID for blue_als apds sensor data: 47024a73-790e-48ba-aac4-7d9e018572ba
- * @retval 
- */
+
+//  @brief  UUID for blue_als apds sensor data: 47024a73-790e-48ba-aac4-7d9e018572ba
 static struct bt_uuid_128 apds_als_blue_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0x47024a73, 0x790e, 0x48ba, 0xaac4, 0x7d9e018572ba));
 
-/**
- * @brief  UUID for green_als apds sensor data: 2f15eb47-9512-4ce3-8897-2f4460df7be4
- * @retval 
- */
+// 	@brief  UUID for green_als apds sensor data: 2f15eb47-9512-4ce3-8897-2f4460df7be4
 static struct bt_uuid_128 apds_als_green_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0x2f15eb47, 0x9512, 0x4ce3, 0x8897, 0x2f4460df7be4));
 
-/**
- * @brief  UUID for clear_als apds sensor data: e960c9b7-e0ed-441e-b22c-d93252fa0fc6
- * @retval 
- */
+// 	@brief  UUID for clear_als apds sensor data: e960c9b7-e0ed-441e-b22c-d93252fa0fc6
+
 static struct bt_uuid_128 apds_als_clear_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0xe960c9b7, 0xe0ed, 0x441e, 0xb22c, 0xd93252fa0fc6));
 
 #endif
 
 #ifdef BMP280
-/**
- * @brief  UUID for clear_als apds sensor data: f4356abe-b85f-47c7-ab4e-54df8f4ad025
- * 
- * e82bd800-c62c-43d5-b03f-c7381b38892a
- * 8b0db31c-28ff-4586-959c-df19026bc5f6
- * @retval 
- */
+
 static struct bt_uuid_128 bmp280_primary_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0xf4356abe, 0xb85f, 0x47c7, 0xab4e, 0x54df8f4ad025));
 #endif
@@ -143,6 +126,28 @@ BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
 static struct bt_uuid_128 lsm6ds33_gyro_z_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0xaf11d0a8, 0x169d, 0x408b, 0x9933, 0xfefd482cdcc6));
 
+#endif
+
+
+#ifdef SCD41
+ 
+//@brief  UUID for clear_als apds sensor data: fb3047b4-df00-4eb3-9587-3b00e5bb5791
+static struct bt_uuid_128 scd41_primary_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0xfb3047b4, 0xdf00, 0x4eb3, 0x9587, 0x3b00e5bb5791));
+
+//@brief  UUID for clear_als apds sensor data: b82febf7-93f8-489e-8f52-b4797e33aab1
+static struct bt_uuid_128 scd41_CO2_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0xb82febf7, 0x93f8, 0x93f8, 0x8f52, 0xb4797e33aab1));
+#endif
+
+#ifdef DS18B20
+//@brief  UUID for clear_als apds sensor data: 8121b46f-56ce-487f-9084-5330700681d5
+static struct bt_uuid_128 ds18b_primary_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x8121b46f, 0x56ce, 0x487f, 0x9084, 0x5330700681d5));
+
+//@brief  UUID for clear_als apds sensor data: 9dbd0e19-372d-4c7e-a1cb-9a6a8e75bf0f
+static struct bt_uuid_128 ds18b_temp_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x9dbd0e19, 0x372d, 0x4c7e, 0xa1cb, 0x9a6a8e75bf0f));
 #endif
 
 static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
@@ -309,6 +314,41 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	BT_GATT_CPF(&gyro),
 
 #endif
+
+#ifdef SCD41
+	BT_GATT_PRIMARY_SERVICE(&scd41_primary_uuid),
+// Caharactersitic Co2 value. attrs[61]
+	BT_GATT_CHARACTERISTIC(&scd41_CO2_uuid.uuid, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CPF(&als),
+
+// charactersitic humidity value. attrs[65]
+	BT_GATT_CHARACTERISTIC(BT_UUID_HUMIDITY, BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ, NULL, NULL, NULL),
+
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+
+// charactersitic temperature value. attrs[68]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ, NULL, NULL, NULL),
+
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+#endif
+
+#ifdef DS18B20
+	BT_GATT_PRIMARY_SERVICE(&ds18b_primary_uuid),
+// Caharactersitic Co2 value. attrs[72]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	// BT_GATT_CPF(&als),
+
+#endif
 );
 
 
@@ -399,6 +439,36 @@ void lsm6ds33_notify(void){
 }
 #endif
 
+
+#ifdef SCD41
+
+void scd41_notify(void){
+	static scd41_t sensor_value;
+	measure_single_shot(&sensor_value);
+	uint16_t Co2 = sensor_value.Co2;
+	uint16_t temp, hum;
+	temp = (uint16_t)(sensor_value.temp*100);
+	hum = (uint16_t)(sensor_value.hum*100);
+	bt_gatt_notify(NULL, &ess_svc.attrs[61], &Co2, sizeof(Co2));
+	bt_gatt_notify(NULL, &ess_svc.attrs[65], &hum, sizeof(hum));
+	bt_gatt_notify(NULL, &ess_svc.attrs[68], &temp, sizeof(temp));
+}
+
+#endif
+
+#ifdef DS18B20
+
+void ds18b_notify(void){
+	static float sensor_value;
+	requestTemperatures();
+	sensor_value = getTempCByIndex(0);
+	static uint16_t some;
+	some = (uint16_t)((sensor_value)*100);
+	bt_gatt_notify(NULL, &ess_svc.attrs[72], &some, sizeof(some));
+	return;
+
+}
+#endif
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA_BYTES(BT_DATA_GAP_APPEARANCE, 0x00, 0x03),
@@ -443,7 +513,10 @@ static void bt_ready(void)
 
 void main(void)
 {
+
 	configure_device();
+
+	
     int err;
 	// enable_uart_console();
 	err = bt_enable(NULL);
@@ -464,9 +537,24 @@ void main(void)
 	read_calibration_registers();
 #endif
 
-#ifdef LSM6DS
+#ifdef LSM6DS33
 	check_device();
 	lsm6ds33_init();
+#endif
+
+#ifdef DS18B20
+extern const struct device *dev_ds18b20;
+	int ret;
+	dev_ds18b20 = device_get_binding(LED1);
+	if (dev_ds18b20 == NULL) {
+		return;
+	}
+
+	ret = gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
+	if (ret < 0) {
+		return;
+	}
+	DallasTemperature_begin();
 #endif
 
     while (1) {
@@ -486,6 +574,12 @@ void main(void)
 
 #ifdef LSM6DS33
 		lsm6ds33_notify();
+#endif
+#ifdef SCD41
+		scd41_notify();
+#endif
+#ifdef DS18B20
+		ds18b_notify();
 #endif
     }
 }

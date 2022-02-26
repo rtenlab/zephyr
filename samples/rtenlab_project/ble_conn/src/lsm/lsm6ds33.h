@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <zephyr.h>
 #include <sys/printk.h>
-#include "uart_i2c.h"
+#include "../uart_i2c.h"
 
 
 #define DEV_ID 105

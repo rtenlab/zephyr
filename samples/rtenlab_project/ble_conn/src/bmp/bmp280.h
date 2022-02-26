@@ -4,7 +4,7 @@
 #include <zephyr.h>
 #include <sys/printk.h>
 #include <stdio.h>
-#include "uart_i2c.h"
+#include "../uart_i2c.h"
 #include <stdlib.h>
 #include <kernel.h>
 
