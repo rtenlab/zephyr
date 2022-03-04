@@ -417,13 +417,21 @@ void lsm6ds33_notify(void){
 	static lsm6ds33_t sensor_value;
 	int16_t gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
 	read_burst_data(&sensor_value);
-	gyroX = (int16_t) ((sensor_value.gyroX)*100);
-	gyroY = (int16_t) ((sensor_value.gyroY)*100);
-	gyroZ = (int16_t) ((sensor_value.gyroZ)*100);
+	gyroX = (int16_t) (((sensor_value.gyroX)*100)+32768);
+	gyroY = (int16_t) ((sensor_value.gyroY)*100+32768);
+	gyroZ = (int16_t) ((sensor_value.gyroZ)*100+32768);
 
-	accelX = (int16_t)((sensor_value.accelX)*100);
-	accelY = (int16_t)((sensor_value.accelY)*100);
-	accelZ = (int16_t)((sensor_value.accelZ)*100);
+	accelX = (int16_t)((sensor_value.accelX)*100+32768);
+	accelY = (int16_t)((sensor_value.accelY)*100+32768);
+	accelZ = (int16_t)((sensor_value.accelZ)*100+32768);
+
+	// gyroX = ~(gyroX-1);
+	// gyroY = ~(gyroY-1);
+	// gyroZ = ~(gyroZ-1);
+
+	// accelX = ~(accelX-1);
+	// accelY = ~(accelY-1);
+	// accelZ = ~(accelZ-1);
 
 	bt_gatt_notify(NULL, &ess_svc.attrs[36], &accelX, sizeof(accelX));
 	bt_gatt_notify(NULL, &ess_svc.attrs[40], &accelY, sizeof(accelY));
@@ -432,9 +440,6 @@ void lsm6ds33_notify(void){
 	bt_gatt_notify(NULL, &ess_svc.attrs[48], &gyroX, sizeof(gyroX));
 	bt_gatt_notify(NULL, &ess_svc.attrs[52], &gyroY, sizeof(gyroY));
 	bt_gatt_notify(NULL, &ess_svc.attrs[56], &gyroZ, sizeof(gyroZ));
-
-	
-
 	return;
 }
 #endif
@@ -528,7 +533,7 @@ void main(void)
 	bt_ready();
 
 	bt_conn_cb_register(&conn_callbacks);
-
+	printk("Badhu chalu to thai gayu\n");
 #ifdef APDS9960
 	enable_apds_sensor();
 #endif
