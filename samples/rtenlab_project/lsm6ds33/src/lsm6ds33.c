@@ -1,13 +1,14 @@
 #include "lsm6ds33.h"
 
-const struct device *dev_i2c;															// Device struct to get device binding for I2C
-uint16_t LSM6DS_ADDR = 0x6A;															// Address of the Sensor on I2C bus as described by Adafruit website
+// Device struct to get device binding for I2C
+const struct device *dev_i2c;
 
-int16_t data_buffer[7];	// Buffer to hold the 16-bit data for each paramter in gyroscope and accel.
+// Buffer to hold the 16-bit data for each paramter in gyroscope and accel.
+int16_t data_buffer[7];	
 float temperature_sensitivity = 256.0;
 float accel_scale_4_G = 0.122;
 float gyro_scale_1000_dps = 35.0;
-
+fifo_t setting;
 
 
 void check_device(void){
@@ -114,9 +115,9 @@ void read_burst_data(lsm6ds33_t *data){
 	data->gyroY = data_buffer[2] * gyro_scale_1000_dps *  SENSORS_DPS_TO_RADS/1000.0;
 	data->gyroZ = data_buffer[3] * gyro_scale_1000_dps *  SENSORS_DPS_TO_RADS/1000.0;
 
-	data->accelX = data_buffer[4] * accel_scale_4_G * SENSORS_GRAVITY_STANDARD / 1000;
-	data->accelY = data_buffer[5] * accel_scale_4_G  *SENSORS_GRAVITY_STANDARD / 1000;
-	data->accelZ = data_buffer[6] * accel_scale_4_G  *SENSORS_GRAVITY_STANDARD / 1000;
+	data->accelX = data_buffer[4] * accel_scale_4_G * SENSORS_GRAVITY_STANDARD / 1000.0;
+	data->accelY = data_buffer[5] * accel_scale_4_G  *SENSORS_GRAVITY_STANDARD / 1000.0;
+	data->accelZ = data_buffer[6] * accel_scale_4_G  *SENSORS_GRAVITY_STANDARD / 1000.0;
 	return;
 }
 
@@ -126,50 +127,73 @@ void print_data(lsm6ds33_t *data){
 	return;
 }
 
+
+void lsm6ds33_set_fifo_settings(fifo_t* setting){
+	// No Decimation for accelerometer.
+	setting->axel_decimation_rate = 1; 
+	// Gyroscope FIFO OFF.
+	setting->gyro_decimation_rate = 0;
+	// 1 -> FIFO mode; 0->Bypass mode; 6->Continuous mode
+	setting->mode = 1;
+	//1->12Hz; 2->26Hz; 3->52Hz and so on. Pg 42 (9.4)
+	setting->sample_rate = 2;
+	// Get 130 words and then raise the water mark flag.
+	setting->threshold = 130;
+	return;
+}
+
+
+
 void lsm6ds33_init(void){
+	// Do the Not FIFO things. 
 	set_gyro_data_rate_range();
 	set_acc_data_rate_range();
-	fifo_t setting;
-	// 001 -> No decimation.
-	setting.axel_decimation_rate = 1; 
-	setting.gyro_decimation_rate = 1;
-	// 110 -> Continuous mode
-	setting.mode = 6;
-
-	//26 HZ. Same as the current gyro and accel data.
-	setting.sample_rate = 2;
-
-	// Not really sure about this.
-	setting.threshold = 1;
-
+	
+#ifdef FIFO_MODE	
+	// Set all the settings.
+	lsm6ds33_set_fifo_settings(&setting);
+	// If this is not included. Need to power off the board after each time you hit the restart button.
+	// Basically, required to start out fresh.
+	lsm6ds33_fifo_change_mode(0);
+	// Set all the registers inside the sensor.
 	lsm6ds33_fifo_begin(&setting);
-	lsm6ds33_fifo_clear();
+#endif
+	return;
 }
 
 
 void lsm6ds33_fifo_begin(fifo_t* setting){
 	uint8_t threshold_lsb = (setting->threshold)&0x00FF;
-	uint8_t threshold_msb = (setting->threshold)&0x0F00>>8;
+	uint8_t threshold_msb = ((setting->threshold)&0x0F00)>>8;
 	uint8_t temp_decimation_rate = (setting->gyro_decimation_rate&0x07)<<3 | (setting->axel_decimation_rate&0x07);
-	printk("final_decimation_rate=%d\n", temp_decimation_rate);
-	
+	uint8_t temp_odr_mode=(setting->sample_rate&0x0F)<<3 | (setting->mode&0x07);
 
-	uint8_t temp_ctrl5=(setting->sample_rate&0x0F)<<3 | (setting->mode&0x07);
-	printk("Final_mode and odr: %d\n", temp_ctrl5);
+	uint8_t stop_on_FTH = 1;
 
+	// printk("final_decimation_rate=%d\n", temp_decimation_rate);
+	// printk("Final_mode and odr: %d\n", temp_ctrl5);
+	// printk("Threshold LSB: %d\n", threshold_lsb);
+	// printk("Threshold MSB: %d\n", threshold_msb);
+
+	// Set the LSB of the threshold register.
 	i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL1, threshold_lsb);
+	// Set the MSB of the threshold register.
 	i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL2, threshold_msb);
+	// Set the decimation rate of the gyroscope and accelerometer.
 	i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL3, temp_decimation_rate);
-	i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL5, temp_ctrl5);
+	// Set the ODR rate and FIFO Mode of the sensor.
+	i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL5, temp_odr_mode);
+	// Set the 0th bit in the CTRL4_C register to make sure we stop taking samples once the water mark flag is set.
+	i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, CTRL4_C, stop_on_FTH);
 }
+
 
 uint16_t lsm6ds33_fifo_status(void){
 	uint8_t buffer[2]; 
 	uint16_t tempAcc=0;
 	i2c_burst_read(dev_i2c, LSM6DS_ADDR, FIFO_STATUS1, &buffer[0], 2);
-	
 	tempAcc = (buffer[1]<<8) | (buffer[0]);
-	printk("Inside status: %d\n", tempAcc&0xF00);
+	// printk("Inside status MSB: %d\n", tempAcc);
 	return tempAcc;
 
 }
@@ -185,8 +209,39 @@ uint16_t lsm6ds33_fifo_read(void){
 
 void lsm6ds33_fifo_clear(void){
 	// The last fourth bit of the returned value will be FIFO_EMPTY flag. Check the flag until we reach it. 
-	while(lsm6ds33_fifo_status() &0x1000){
+	while((lsm6ds33_fifo_status() &0x1000) == 0){
 		lsm6ds33_fifo_read();
+		// printk("Clearing FiFO\n");
 	}
 	return;
+}
+
+void lsm6ds33_fifo_change_mode(uint8_t selected_mode){
+	if((selected_mode&1) == 0){
+		// printk("Setting the bypass mode!!!\n");
+		uint8_t temp_ctrl5=(setting.sample_rate&0x0F)<<3 | (selected_mode&0x07);
+		i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL5, temp_ctrl5);
+	}
+	else{
+		selected_mode=1;
+		uint8_t temp_ctrl5=(setting.sample_rate&0x0F)<<3 | (selected_mode&0x07);
+		i2c_reg_write_byte(dev_i2c, LSM6DS_ADDR, FIFO_CTRL5, temp_ctrl5);
+	}
+
+}
+
+void set_bdu_bit(void){
+	uint8_t temp = 1<<6;
+	i2c_reg_write_byte(dev_i2c,LSM6DS_ADDR, CTRL3_C, temp);
+	return;
+}
+
+float lsm6ds33_fifo_get_gyro_data(uint16_t data){
+	float temp = data * gyro_scale_1000_dps *  SENSORS_DPS_TO_RADS/1000.0;
+	return temp;
+}
+
+float lsm6ds33_fifo_get_accel_data(int16_t data){
+	float temp = (float)data * accel_scale_4_G * SENSORS_GRAVITY_STANDARD / 1000.0;
+	return temp;
 }

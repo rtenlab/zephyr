@@ -14,7 +14,8 @@
  */
 #include "lsm6ds33.h"
 
-
+// #define SINGLE_SHOT_MODE
+#define FIFO_MODE
 
 void main(void){
 	lsm6ds33_t lsm6ds33_sensor_data;
@@ -34,40 +35,43 @@ void main(void){
 	gyro_set_power_mode(GYRO_LOW_POWER_MODE);
 	
 	
-	/**
-	 */// Normal mode without using the FIFO mode.
-	  
-	// while(1){
-	// 	// currently working on 26Hz frequency. Set the delay accordingly.
-	// 	delay(1);
-	// 	status_reg();
-	// 	get_accel_rate();
-	// 	read_burst_data(&lsm6ds33_sensor_data);
-	// 	print_data(&lsm6ds33_sensor_data);
-	// }
+	
+#ifdef SINGLE_SHOT_MODE  
+	while(1){
+		// currently working on 26Hz frequency. Set the delay accordingly.
+		delay(1);
+		status_reg();
+		get_accel_rate();
+		read_burst_data(&lsm6ds33_sensor_data);
+		print_data(&lsm6ds33_sensor_data);
+	}
+#endif
 
+#ifdef FIFO_MODE
 /**
  * @brief  Using the FIFO mode. Still some things needs to be done! 
  * @note   Check for the decimation rate and the ODR.
  * @retval 
  */
+
 	while(1){
-	while( (lsm6ds33_fifo_status() &0x8000) == 0) {printk("Waiting for watermark\n");};
+		printk("Waiting for watermark...\nIf you want to see some changes in the readings change the orientation of the board right now!!!\n");
 
-	while( (lsm6ds33_fifo_status()&0x1000) == 0){
-		printk("GyroX_Raw: %d\n", lsm6ds33_fifo_read());
-		printk("GyroY_Raw: %d\n", lsm6ds33_fifo_read());
-		printk("GyroZ_Raw: %d\n", lsm6ds33_fifo_read());
+		//  Check if the FIFO_FULL Flag is set or not.
+		while((lsm6ds33_fifo_status() & FIFO_FULL) == 0) { };
 
-		printk("AccelX_Raw: %d\n", lsm6ds33_fifo_read());
-		printk("AccelY_Raw: %d\n", lsm6ds33_fifo_read());
-		printk("AccelZ_Raw: %d\n", lsm6ds33_fifo_read());
-		delay(10);
+		while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
+			printk("AccelX_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+			printk("AccelY_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+			printk("AccelZ_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+			delay(50);
+		}
+		lsm6ds33_fifo_change_mode(0);
+
+		lsm6ds33_fifo_change_mode(1);
+
 	}
-
-	printk("\n\n Current FiFO Status: 0x%x", lsm6ds33_fifo_status());
-	}
-
+#endif
 		
 	return;
 }
