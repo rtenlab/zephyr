@@ -1,6 +1,9 @@
-#right your most recent used here
-nothing:button
-
+bme:
+	./make.sh bme680
+	./flash.sh
+i2c:
+	./make.sh i2c_scanner
+	./flash.sh
 per:
 	./make.sh ble_conn
 	./flash.sh
