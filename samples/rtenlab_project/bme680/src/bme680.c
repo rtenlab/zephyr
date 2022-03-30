@@ -19,3 +19,202 @@ bool bme680_getid(void){
         return false;
     return true;    
 }
+
+bool bme680_get_gas_calib_data(bme680_gas_par_t* calib){
+    uint8_t temp=0;
+    uint8_t ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_par_g1, &temp);
+    calib->para1 = (int8_t)temp;
+    temp=0;
+    if(ret!=0){
+        printk("Error while reading the first calibration parameter!!!\n Exiting....\n");
+        return false;
+    } 
+    uint8_t buf[2] = {0,0};
+    ret = i2c_burst_read(dev_i2c, BME680_Addr, BME680_par_g2_LSB, &buf[0], 2);
+    if(ret!=0){
+        printk("Error while reading the second calibration parameter!!!\n Exiting....\n");
+        return false;
+    }
+    calib->para2 = (uint16_t)((buf[1]<<8) | (buf[0]));
+    
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_par_g3, &temp);
+    calib->para3 = (int8_t)temp;
+    if(ret!=0){
+        printk("Error while reading the third calibration parameter!!!\n Exiting....\n");
+        return false;
+    }
+    temp=0;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_res_heat_range, &temp);
+    if(ret!=0){
+        printk("Error while reading the third calibration parameter!!!\n Exiting....\n");
+        return false;
+    }
+    printk("Temp for res_heat_range: %d\n", temp);
+    calib->res_heat_range = ((temp & BME680_res_heat_range_mask) / 16);
+    
+    temp=0;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_res_heat_val, &temp);
+    if(ret!=0){
+        printk("Error while reading the third calibration parameter!!!\n Exiting....\n");
+        return false;
+    }
+    calib->res_heat_val= (int8_t)temp;
+
+    temp=0;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_range_sw_err, &temp);
+    if(ret!=0){
+        printk("Error while reading the third calibration parameter!!!\n Exiting....\n");
+        return false;
+    }
+    printk("Temp for res_range_err: %d\n", temp);
+    calib->range_sw_err= ((int8_t)temp & (int8_t)BME680_RSERROR_MSK) / 16;
+    calib->amb_temp = 25;
+    return true;
+}
+
+uint8_t bme680_calc_gas_wait(uint16_t dur)
+{
+    uint8_t factor = 0;
+    uint8_t durval;
+
+    if (dur >= 0xfc0)
+    {
+        durval = 0xff; /* Max duration*/
+    }
+    else
+    {
+        while (dur > 0x3F)
+        {
+            dur = dur / 4;
+            factor += 1;
+        }
+
+        durval = (uint8_t)(dur + (factor * 64));
+    }
+
+    return durval;
+}
+
+uint8_t bme680_calculate_res_heat(uint16_t temp, bme680_gas_par_t* calib){
+    uint8_t heatr_res;
+    int32_t var1;
+    int32_t var2;
+    int32_t var3;
+    int32_t var4;
+    int32_t var5;
+    int32_t heatr_res_x100;
+
+    if (temp > 400) /* Cap temperature */
+    {
+        temp = 400;
+    }
+
+    var1 = (((int32_t)calib->amb_temp * calib->para3) / 1000) * 256;
+    var2 = (calib->para1 + 784) * (((((calib->para2 + 154009) * temp * 5) / 100) + 3276800) / 10);
+    var3 = var1 + (var2 / 2);
+    var4 = (var3 / (calib->res_heat_range + 4));
+    var5 = (131 * calib->res_heat_val) + 65536;
+    heatr_res_x100 = (int32_t)(((var4 / var5) - 250) * 34);
+    heatr_res = (uint8_t)((heatr_res_x100 + 50) / 100);
+    return heatr_res;
+}
+
+bool bme680_set_heater_conf(uint16_t heaterTemp, uint16_t heaterTime, bme680_gas_par_t* calib){
+    // If the heating temperature and time is invalid return false.
+    if((heaterTemp==0) || (heaterTime==0)){
+        printk("Invalid Temp. or Time\n");
+        return false;
+    }
+    uint8_t res_heat = bme680_calculate_res_heat(heaterTemp, calib);
+    uint8_t gas_wait = bme680_calc_gas_wait(heaterTime);
+    // Setting the resistance heating by changing the actual value using the function "bme680_calculate_res_heat".
+    int ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Res_Heat0, &res_heat);
+    if(ret!=0){
+        printk("Problem in setting the res_heat in bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+    // Setting the gas wait by changing the actual value using the function "bme_calc_gas_wait".
+    gas_wait &= BME680_Gas_Wait0_msk;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Gas_Wait0, &gas_wait);
+    if(ret!=0){
+        printk("Problem in setting the gas_Wait in bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+    // Setting the nbconv and making the run_gas bit to 1 so that it will start measuring the gas values.
+    uint8_t nb_conv_msk = 0x10;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, &nb_conv_msk);
+    if(ret!=0){
+        printk("Problem in setting the nb_conv in bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+    // If no errors, return true.
+    return true;
+}
+
+/**
+ * @brief  set the current power mode of the sensor
+ * @note   
+ * @param  mode: 0-> Sleep mode. 1->Forced Mode
+ * @retval TRUE: if the power mode was set successfully; FALSE: if something wrong with i2c_reg_read_byte 
+ */
+bool bme680_set_power_mode(uint8_t mode){
+    uint8_t ret;
+    if(mode==1){
+        ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_meas, &mode);
+        if(ret!=0){
+            printk("Problem settting the mode to 1\n");
+            return false;
+        }
+    }
+    else{
+        ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_meas, &mode);
+        if(ret!=0){
+            printk("Problem settting the mode to 1\n");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool bme680_get_raw_gas_data(bme680_gas_data_t* gasdata){
+    uint8_t ret,  buffer[2] = {0};
+    ret = i2c_burst_read(dev_i2c, BME680_Addr, BME680_Gas_r_msb, &buffer[0], 2);
+    if(ret!=0){
+        printk("Problem while reading the MSB of the Gas ADC value in function 'bme680_get_gas_value'\n");
+        return false;
+    }
+    gasdata->adc_gas_res = (uint16_t)(((buffer[0])<<2) | ((buffer[1]&0xC0)>>6));
+    // gasdata->adc_gas_res_high = buffer[0];
+    // gasdata->adc_gas_res_low = (buffer[1]&0xC0)>>6;
+    gasdata->gas_range = (buffer[1]&0x0F);
+    gasdata->gas_valid_bit = (buffer[1]&0x20);
+    gasdata->heater_stability_bit = (buffer[1]&0x10);    
+    return true;
+}
+
+uint32_t calc_gas_resistance(bme680_gas_data_t* gasdata, bme680_gas_par_t* calibdata)
+{
+	int64_t var1;
+	uint64_t var2;
+	int64_t var3;
+	uint32_t calc_gas_res;
+	/**Look up table 1 for the possible gas range values */
+	uint32_t lookupTable1[16] = { UINT32_C(2147483647), UINT32_C(2147483647), UINT32_C(2147483647), UINT32_C(2147483647),
+		UINT32_C(2147483647), UINT32_C(2126008810), UINT32_C(2147483647), UINT32_C(2130303777),
+		UINT32_C(2147483647), UINT32_C(2147483647), UINT32_C(2143188679), UINT32_C(2136746228),
+		UINT32_C(2147483647), UINT32_C(2126008810), UINT32_C(2147483647), UINT32_C(2147483647) };
+	/**Look up table 2 for the possible gas range values */
+	uint32_t lookupTable2[16] = { UINT32_C(4096000000), UINT32_C(2048000000), UINT32_C(1024000000), UINT32_C(512000000),
+		UINT32_C(255744255), UINT32_C(127110228), UINT32_C(64000000), UINT32_C(32258064), UINT32_C(16016016),
+		UINT32_C(8000000), UINT32_C(4000000), UINT32_C(2000000), UINT32_C(1000000), UINT32_C(500000),
+		UINT32_C(250000), UINT32_C(125000) };
+
+	var1 = (int64_t) ((1340 + (5 * (int64_t) calibdata->range_sw_err)) *
+		((int64_t) lookupTable1[gasdata->gas_range])) >> 16;
+	var2 = (((int64_t) ((int64_t) gasdata->adc_gas_res << 15) - (int64_t) (16777216)) + var1);
+	var3 = (((int64_t) lookupTable2[gasdata->gas_range] * (int64_t) var1) >> 9);
+	calc_gas_res = (uint32_t) ((var3 + ((int64_t) var2 >> 1)) / (int64_t) var2);
+
+	return calc_gas_res;
+}
+

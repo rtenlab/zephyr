@@ -34,5 +34,28 @@ void main(void){
 	if(!bme680_getid()){
 		printk("BME680: Get ID returned with false at line %d\n", __LINE__);
 	}
+
+	bme680_gas_par_t gascalib;
+	bme680_gas_data_t gasdata;
+	if(!bme680_get_gas_calib_data(&gascalib)){
+		printk("BME680: Gas Calib data returned with false at line %d\n", __LINE__);
+	}
+#ifdef DEBUG
+	printk("%d\n",gascalib.para1);
+	printk("%d\n",gascalib.para2);
+	printk("%d\n",gascalib.para3);
+	printk("%d\n",gascalib.res_heat_range);
+	printk("%d\n",gascalib.res_heat_val);
+	printk("%d\n",gascalib.range_sw_err);
+#endif
+
+	while(1){
+		bme680_set_heater_conf(320,150,&gascalib);
+		bme680_set_power_mode(1);
+		delay(200);
+		bme680_get_raw_gas_data(&gasdata);
+		printk("Value of the gas is: %d\n",calc_gas_resistance(&gasdata, &gascalib));
+	}
+
 	return;
 }

@@ -1,3 +1,9 @@
+thread_analyzer:
+	./make.sh thread_analysis_testbed
+	./flash.sh
+sync:
+	./make.sh synchronization
+	./flash.sh
 bme:
 	./make.sh bme680
 	./flash.sh
@@ -16,7 +22,7 @@ blink:
 bt:
 	./make.sh beacon_dev_implementation
 	./flash.sh
-sync:
+sync_dev:
 	./make.sh synchronization_dev_implementation
 	./flash.sh
 all:

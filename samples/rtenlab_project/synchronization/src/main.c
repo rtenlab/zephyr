@@ -45,6 +45,8 @@ void helloLoop(const char *my_name,
 	const char *tname;
 	uint8_t cpu;
 	struct k_thread *current_thread;
+	k_thread_runtime_stats_t rt_stats_thread;
+
 
 	while (1) {
 		/* take my semaphore */
@@ -65,6 +67,11 @@ void helloLoop(const char *my_name,
 			printk("%s: Hello World from cpu %d on %s!\n",
 				tname, cpu, CONFIG_BOARD);
 		}
+
+
+	k_thread_runtime_stats_get(k_current_get(), &rt_stats_thread);
+
+	printk("Cycles: %llu\n", rt_stats_thread.execution_cycles);
 
 		/* wait a while, then let other thread have a turn */
 		k_busy_wait(100000);
