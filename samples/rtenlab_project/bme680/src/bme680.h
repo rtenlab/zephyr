@@ -52,6 +52,7 @@
 #define BME680_range_sw_err 0x04
 #define BME680_RSERROR_MSK 0xF0
 
+#define FPU_EN
 
 typedef struct {
     uint8_t amb_temp;
@@ -76,10 +77,21 @@ bool bme680_getid(void);
 bool bme680_get_gas_calib_data(bme680_gas_par_t*);
 bool bme680_set_power_mode(uint8_t);
 bool bme680_set_heater_conf(uint16_t , uint16_t , bme680_gas_par_t*);
+#ifdef FPU_EN
+float bme680_calculate_res_heat(uint16_t , bme680_gas_par_t*);
+#else
 uint8_t bme680_calculate_res_heat(uint16_t , bme680_gas_par_t*);
+#endif
+
 uint8_t bme680_calc_gas_wait(uint16_t);
-uint32_t calc_gas_resistance(bme680_gas_data_t* , bme680_gas_par_t*);
+#ifdef FPU_EN
+float bme680_calc_gas_resistance(bme680_gas_data_t* , bme680_gas_par_t*);
+#else
+uint32_t bme680_calc_gas_resistance(bme680_gas_data_t* , bme680_gas_par_t*);
+#endif
+
 bool bme680_get_raw_gas_data(bme680_gas_data_t*);
+bool bme680_check_new_data(void);
 
 
 

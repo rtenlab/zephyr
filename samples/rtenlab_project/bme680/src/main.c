@@ -52,9 +52,17 @@ void main(void){
 	while(1){
 		bme680_set_heater_conf(320,150,&gascalib);
 		bme680_set_power_mode(1);
+		#ifdef DEBUG
+		printk("Before: ");
+		bme680_check_new_data();
+		#endif
 		delay(200);
+		#ifdef DEBUG
+		printk("After: ");
+		bme680_check_new_data();
+		#endif
 		bme680_get_raw_gas_data(&gasdata);
-		printk("Value of the gas is: %d\n",calc_gas_resistance(&gasdata, &gascalib));
+		printk("Value of the gas sensor output is: %f KOhms\n",bme680_calc_gas_resistance(&gasdata, &gascalib)/1000.00);
 	}
 
 	return;
