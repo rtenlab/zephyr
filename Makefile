@@ -1,3 +1,6 @@
+final:
+	./make.sh final_adafruit_peripheral_bluetooth_multi
+	./flash.sh
 thread_analyzer:
 	./make.sh thread_analysis_testbed
 	./flash.sh
