@@ -358,7 +358,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
  * @note   Same can be implemented for different sensors. Not sure why humidity value has attrs[4].
  * @retval None
  */
-void ess_notify(void)
+void sht_notify(void)
 {
 	static sht31_t sensor_value;
     int16_t temp_value, hum_value;
@@ -566,7 +566,7 @@ extern const struct device *dev_ds18b20;
         delay(1000);
 
 #ifdef SHT31
-        ess_notify();
+        sht_notify();
 #endif
 
 #ifdef APDS9960
