@@ -52,7 +52,7 @@
 #define BME680_range_sw_err 0x04
 #define BME680_RSERROR_MSK 0xF0
 
-#define FPU_EN
+// #define FPU_EN 0
 
 typedef struct {
     uint8_t amb_temp;

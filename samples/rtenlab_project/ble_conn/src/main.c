@@ -30,6 +30,7 @@
 #include "scd/scd41.h"
 #include "ds/Onewire.h"
 #include "ds/Dallas_temperature.h"
+#include "bme680/bme680.h"
 
 #define SHT31
 #define APDS9960
@@ -37,10 +38,11 @@
 #define LSM6DS33
 // #define SCD41
 // #define DS18B20
-
+// #define BME680
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
 #define CPF_FORMAT_UINT16 	0x06
+#define CPF_FORMAT_UINT32	0x08
 
 // Defines to get the unitsof the data sent using custom characteristics UUID
 
@@ -48,6 +50,7 @@
 #define CPF_UNIT_METER 		0x2701
 #define CPF_UNIT_ACCEL 		0x2713
 #define CPF_UNIT_ANG_VEL	0x2743
+#define CPF_UNIT_ELEC_RES		0x272A
 
 #ifdef SHT31
 
@@ -95,18 +98,6 @@ static struct bt_uuid_128 lsm6ds33_accl_y_uuid = BT_UUID_INIT_128(
 static struct bt_uuid_128 lsm6ds33_accl_z_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0xe6837dcc, 0xff0b, 0x4329, 0xa271, 0xc3269c61b10d));
 
-//@brief  UUID for clear_als apds sensor data: 54adba22-25c7-49d2-b4be-dbbb1a77efa3
-static struct bt_uuid_128 lsm6ds33_gyro_x_uuid = BT_UUID_INIT_128(
-	BT_UUID_128_ENCODE(0x54adba22, 0x25c7, 0x49d2, 0xb4be, 0xdbbb1a77efa3));
-
-//@brief  UUID for clear_als apds sensor data: 67b2890f-e716-45e8-a8fe-4213db675224
-static struct bt_uuid_128 lsm6ds33_gyro_y_uuid = BT_UUID_INIT_128(
-BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
-
-//@brief  UUID for clear_als apds sensor data: af11d0a8-169d-408b-9933-fefd482cdcc6
-static struct bt_uuid_128 lsm6ds33_gyro_z_uuid = BT_UUID_INIT_128(
-	BT_UUID_128_ENCODE(0xaf11d0a8, 0x169d, 0x408b, 0x9933, 0xfefd482cdcc6));
-
 #endif
 
 
@@ -129,6 +120,17 @@ static struct bt_uuid_128 ds18b_primary_uuid = BT_UUID_INIT_128(
 //@brief  UUID for clear_als apds sensor data: 9dbd0e19-372d-4c7e-a1cb-9a6a8e75bf0f
 static struct bt_uuid_128 ds18b_temp_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0x9dbd0e19, 0x372d, 0x4c7e, 0xa1cb, 0x9a6a8e75bf0f));
+#endif
+
+#ifdef BME680
+//@brief  UUID for bme680 apds sensor data: 54adba22-25c7-49d2-b4be-dbbb1a77efa3
+static struct bt_uuid_128 bme680_primary_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x54adba22, 0x25c7, 0x49d2, 0xb4be, 0xdbbb1a77efa3));
+
+//@brief  UUID for bme680 apds sensor data: 67b2890f-e716-45e8-a8fe-4213db675224
+static struct bt_uuid_128 bme680_gas_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
+
 #endif
 
 static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
@@ -177,6 +179,20 @@ static const struct bt_gatt_cpf gyro = {
 	.unit = CPF_UNIT_ANG_VEL,
 };
 #endif
+
+#ifdef BME680
+
+/**
+ * @brief  Struct bt_gatt_cpf to construct the charactersitics presentation format.
+ * @note   This sensor uses 32bit data and the unit is electrical resistance
+ */
+static const struct bt_gatt_cpf bme680_gas = {
+	.format = CPF_FORMAT_UINT32,
+	.unit = CPF_UNIT_ELEC_RES,
+};
+
+#endif
+
 
 BT_GATT_SERVICE_DEFINE(ess_svc,
 // Primary Service for SHT Sensor. Basically Tempearture and sensor value.
@@ -247,6 +263,18 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	BT_GATT_CPF(&accel),
 
 #endif
+#ifdef BME680
+// Primary Service for BME680 sensor.
+	BT_GATT_PRIMARY_SERVICE(&bme680_primary_uuid),
+
+// Characteristic blue_als data value and descriptors for unit and format. attr[48]
+	BT_GATT_CHARACTERISTIC(&bme680_gas_uuid.uuid, BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+			BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CPF(&bme680_gas),
+
+#endif
 
 #ifdef SCD41
 	BT_GATT_PRIMARY_SERVICE(&scd41_primary_uuid),
@@ -282,6 +310,9 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	// BT_GATT_CPF(&als),
 
 #endif
+
+
+
 );
 
 
@@ -385,6 +416,49 @@ void ds18b_notify(void){
 
 }
 #endif
+
+#ifdef BME680
+
+void bme680_notify(bool send){
+	bme680_gas_par_t gascalib;
+	bme680_gas_data_t gasdata;
+	if(!bme680_get_gas_calib_data(&gascalib)){
+		printk("BME680: Gas Calib data returned with false at line %d\n", __LINE__);
+	}
+#ifdef DEBUG
+	printk("%d\n",gascalib.para1);
+	printk("%d\n",gascalib.para2);
+	printk("%d\n",gascalib.para3);
+	printk("%d\n",gascalib.res_heat_range);
+	printk("%d\n",gascalib.res_heat_val);
+	printk("%d\n",gascalib.range_sw_err);
+#endif
+	// Set the coil to start heating.
+	bme680_set_heater_conf(320,150,&gascalib);
+	// Change the power mode to forced mode.
+	bme680_set_power_mode(1);
+	#ifdef DEBUG
+	printk("Before: ");
+	// Check if we are getting a new data or no.
+	bme680_check_new_data();
+	#endif
+	// Wait for the heater to heat.
+	delay(200);
+	#ifdef DEBUG
+	printk("After: ");
+	// Check again if we are getting a new data or no.
+	bme680_check_new_data();
+	#endif
+	// Get the raw data from the registers.
+	bme680_get_raw_gas_data(&gasdata);
+	static uint32_t value =0;
+	value = (bme680_calc_gas_resistance(&gasdata, &gascalib));
+	if(send)
+		bt_gatt_notify(NULL, &ess_svc.attrs[33], &value, sizeof(value));
+	return;
+
+}
+#endif
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA_BYTES(BT_DATA_GAP_APPEARANCE, 0x00, 0x03),
@@ -477,7 +551,6 @@ extern const struct device *dev_ds18b20;
 	}
 	DallasTemperature_begin();
 #endif
-
     while (1) {
         delay(1000);
 
@@ -501,6 +574,9 @@ extern const struct device *dev_ds18b20;
 #endif
 #ifdef DS18B20
 		ds18b_notify();
+#endif
+#ifdef BME680
+		bme680_notify(true);
 #endif
     }
 }

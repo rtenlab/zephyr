@@ -62,7 +62,7 @@ void main(void){
 		bme680_check_new_data();
 		#endif
 		bme680_get_raw_gas_data(&gasdata);
-		printk("Value of the gas sensor output is: %f KOhms\n",bme680_calc_gas_resistance(&gasdata, &gascalib)/1000.00);
+		printk("Value of the gas sensor output is: %d KOhms\n",bme680_calc_gas_resistance(&gasdata, &gascalib)/1000);
 	}
 
 	return;
