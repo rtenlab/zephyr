@@ -50,7 +50,7 @@ void main(void){
 #endif
 
 	while(1){
-		bme680_set_heater_conf(320,150,&gascalib);
+		bme680_set_heater_conf(350,150,&gascalib);
 		bme680_set_power_mode(1);
 		#ifdef DEBUG
 		printk("Before: ");

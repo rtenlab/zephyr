@@ -36,9 +36,9 @@
 #define APDS9960
 #define BMP280
 #define LSM6DS33
-// #define SCD41
-// #define DS18B20
-// #define BME680
+#define SCD41
+#define DS18B20
+#define BME680
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
 #define CPF_FORMAT_UINT16 	0x06
@@ -263,18 +263,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	BT_GATT_CPF(&accel),
 
 #endif
-#ifdef BME680
-// Primary Service for BME680 sensor.
-	BT_GATT_PRIMARY_SERVICE(&bme680_primary_uuid),
 
-// Characteristic blue_als data value and descriptors for unit and format. attr[48]
-	BT_GATT_CHARACTERISTIC(&bme680_gas_uuid.uuid, BT_GATT_CHRC_NOTIFY,
-					BT_GATT_PERM_READ, NULL, NULL, NULL),
-	BT_GATT_CCC(hrmc_ccc_cfg_changed,
-			BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	BT_GATT_CPF(&bme680_gas),
-
-#endif
 
 #ifdef SCD41
 	BT_GATT_PRIMARY_SERVICE(&scd41_primary_uuid),
@@ -311,6 +300,18 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 
 #endif
 
+#ifdef BME680
+// Primary Service for BME680 sensor.
+	BT_GATT_PRIMARY_SERVICE(&bme680_primary_uuid),
+
+// Characteristic blue_als data value and descriptors for unit and format. attr[48]
+	BT_GATT_CHARACTERISTIC(&bme680_gas_uuid.uuid, BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+			BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CPF(&bme680_gas),
+
+#endif
 
 
 );
@@ -407,7 +408,9 @@ void scd41_notify(void){
 
 void ds18b_notify(void){
 	static float sensor_value;
+	uint8_t n_devices = getDeviceCount();
 	requestTemperatures();
+	// for(int i=0)
 	sensor_value = getTempCByIndex(0);
 	static uint16_t some;
 	some = (uint16_t)((sensor_value)*100);
@@ -434,7 +437,7 @@ void bme680_notify(bool send){
 	printk("%d\n",gascalib.range_sw_err);
 #endif
 	// Set the coil to start heating.
-	bme680_set_heater_conf(320,150,&gascalib);
+	bme680_set_heater_conf(350,150,&gascalib);
 	// Change the power mode to forced mode.
 	bme680_set_power_mode(1);
 	#ifdef DEBUG
@@ -454,7 +457,7 @@ void bme680_notify(bool send){
 	static uint32_t value =0;
 	value = (bme680_calc_gas_resistance(&gasdata, &gascalib));
 	if(send)
-		bt_gatt_notify(NULL, &ess_svc.attrs[33], &value, sizeof(value));
+		bt_gatt_notify(NULL, &ess_svc.attrs[48], &value, sizeof(value));
 	return;
 
 }
@@ -552,7 +555,6 @@ extern const struct device *dev_ds18b20;
 	DallasTemperature_begin();
 #endif
     while (1) {
-        delay(1000);
 
 #ifdef SHT31
         sht_notify();

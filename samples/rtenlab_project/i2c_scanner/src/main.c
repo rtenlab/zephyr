@@ -41,7 +41,7 @@ void main(void)
 		printk("I2C: Device driver not found.\n");
 		return;
 	}
-
+	printk("Got device binding\n");
 	for (uint8_t i = 4; i <= 0x77; i++) {
 		struct i2c_msg msgs[1];
 		uint8_t dst;
@@ -50,8 +50,8 @@ void main(void)
 		msgs[0].buf = &dst;
 		msgs[0].len = 0U;
 		msgs[0].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
-
-		if (i2c_transfer(i2c_dev, &msgs[0], 1, i) == 0) {
+		
+		if (i2c_transfer(i2c_dev, &msgs[0], 1, i)==0) {
 			printk("0x%2x FOUND\n", i);
 		}
 	}

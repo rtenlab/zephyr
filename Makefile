@@ -19,8 +19,8 @@ per:
 button:
 	./make.sh button
 	./flash.sh
-blink:
-	./make.sh blinky
+ds:
+	./make.sh ds18b20
 	./flash.sh
 bt:
 	./make.sh beacon_dev_implementation
