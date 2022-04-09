@@ -296,15 +296,37 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 			       BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	// BT_GATT_CPF(&als),
 
+	// Caharactersitic Co2 value. attrs[47]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+			
+	// Caharactersitic Co2 value. attrs[50]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	
+	// Caharactersitic Co2 value. attrs[53]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	
+	// Caharactersitic Co2 value. attrs[56]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 #endif
 
 #ifdef BME680
 // Primary Service for BME680 sensor.
 	BT_GATT_PRIMARY_SERVICE(&bme680_primary_uuid),
 
-// Characteristic blue_als data value and descriptors for unit and format. attr[48]
+// Characteristic blue_als data value and descriptors for unit and format. attr[60]
 	BT_GATT_CHARACTERISTIC(&bme680_gas_uuid.uuid, BT_GATT_CHRC_NOTIFY,
 					BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
@@ -407,14 +429,23 @@ void scd41_notify(void){
 #ifdef DS18B20
 
 void ds18b_notify(void){
+	volatile uint8_t n_devices = getDeviceCount();
 	static float sensor_value;
-	uint8_t n_devices = getDeviceCount();
 	requestTemperatures();
-	// for(int i=0)
-	sensor_value = getTempCByIndex(0);
-	static uint16_t some;
-	some = (uint16_t)((sensor_value)*100);
-	bt_gatt_notify(NULL, &ess_svc.attrs[44], &some, sizeof(some));
+	uint8_t index;
+	static uint16_t some[5];	
+
+	for(int i=0; i<n_devices; i++){
+		sensor_value = getTempCByIndex(i);
+		some[i] = (uint16_t)((sensor_value)*100);
+		delay(10);
+	}
+	bt_gatt_notify(NULL, &ess_svc.attrs[44], &some[0], sizeof(some[0]));
+	bt_gatt_notify(NULL, &ess_svc.attrs[47], &some[1], sizeof(some[0]));
+	bt_gatt_notify(NULL, &ess_svc.attrs[50], &some[2], sizeof(some[0]));
+	bt_gatt_notify(NULL, &ess_svc.attrs[53], &some[3], sizeof(some[0]));
+	bt_gatt_notify(NULL, &ess_svc.attrs[56], &some[4], sizeof(some[0]));
+
 	return;
 
 }
@@ -457,7 +488,7 @@ void bme680_notify(bool send){
 	static uint32_t value =0;
 	value = (bme680_calc_gas_resistance(&gasdata, &gascalib));
 	if(send)
-		bt_gatt_notify(NULL, &ess_svc.attrs[48], &value, sizeof(value));
+		bt_gatt_notify(NULL, &ess_svc.attrs[60], &value, sizeof(value));
 	return;
 
 }
