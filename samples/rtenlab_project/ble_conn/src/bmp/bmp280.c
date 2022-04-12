@@ -111,7 +111,7 @@ float read_pressure(void){
 	var2 = (((int64_t)calib_data_signed_registers[8]) * p) >> 19;
 
 	p = ((p + var1 + var2) >> 8) + (((int64_t) calib_data_signed_registers[7]) << 4);
-	printk("Value of p: %lld\n",p);
+	// printk("Value of p: %lld\n",p);
 	return (float)p/256;
 }
 

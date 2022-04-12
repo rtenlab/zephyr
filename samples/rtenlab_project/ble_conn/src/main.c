@@ -30,15 +30,17 @@
 #include "scd/scd41.h"
 #include "ds/Onewire.h"
 #include "ds/Dallas_temperature.h"
-#include "bme680/bme680.h"
+// #include "bme680/bme680.h"
+// #include "blinky/blink.c"
 
 #define SHT31
 #define APDS9960
 #define BMP280
 #define LSM6DS33
 #define SCD41
-#define DS18B20
-#define BME680
+// #define DS18B20
+// #define BME680
+#define BLE
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
 #define CPF_FORMAT_UINT16 	0x06
@@ -511,12 +513,17 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	int err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
-	if (err) {
-		printk("Advertising failed to start (err %d)\n", err);
-		return;
+	int8_t err = bt_conn_disconnect(conn, 2);
+	if(err){
+		led_on_blink1(true);
+		k_busy_wait(10000000);
+		led_on_blink1(false);
 	}
+	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
+		printk("Advertising failed to start (err %d)\n", err);
+	printk("Advertising with Connectable\n");
 	printk("Disconnected (reason 0x%02x)\n", reason);
+	return;
 }
 
 static struct bt_conn_cb conn_callbacks = {
@@ -543,11 +550,12 @@ static void bt_ready(void)
 void main(void)
 {
 
+	enable_uart_console();
 	configure_device();
 
-	
+#ifdef BLE
     int err;
-	// enable_uart_console();
+	
 	err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
@@ -557,6 +565,8 @@ void main(void)
 	bt_ready();
 
 	bt_conn_cb_register(&conn_callbacks);
+	printk("Call backs registered\n");
+#endif	
 	printk("Badhu chalu to thai gayu\n");
 #ifdef APDS9960
 	enable_apds_sensor();
@@ -585,7 +595,9 @@ extern const struct device *dev_ds18b20;
 	}
 	DallasTemperature_begin();
 #endif
+printk("Reached: Just before the while loop\n");
     while (1) {
+		printk("Sending data currently at the start of the loop!!!");
 
 #ifdef SHT31
         sht_notify();
