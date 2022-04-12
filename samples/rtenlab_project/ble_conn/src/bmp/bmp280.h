@@ -24,6 +24,7 @@
 #define REG_TEMP_MSB 0xFA
     #define REG_TEMP_LSB 0xFB
     #define REG_TEMP_XLSB 0xFC  // (bit 7,6,5,4)
+
 /**
 * [7:5] READING TEMP. SAMPLING X16
 * [4:2] READING PRESS SAMPLING X16

@@ -14,7 +14,10 @@ void check_device(void){
 	uint8_t device_id=0;
 	i2c_reg_read_byte(dev_i2c, LSM6DS_ADDR, 0X0F, &device_id);
 	if(device_id == DEV_ID)
+		#ifdef DEBUG
 		printk("LSM6DS33 device found!\n");
+		#endif
+		return;
 }
 
 /**

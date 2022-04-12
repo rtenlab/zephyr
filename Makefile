@@ -1,3 +1,6 @@
+ds_ble:
+	./make.sh DS18B20_Ble
+	./flash.sh
 final:
 	./make.sh final_adafruit_peripheral_bluetooth_multi
 	./flash.sh

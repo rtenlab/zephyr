@@ -18,17 +18,23 @@ uint8_t check_sensor(void){
     uint8_t temp;
     i2c_reg_read_byte(dev_i2c,BMP280_ADDR,REG_ID,&temp);															
 	if(temp==0x58){
+		#ifdef DEBUG
 		printk("Bosch BMP280 Found!\n");
+		#endif
         return 1;
     }
     else{
+		#ifdef DEBUG
         printk("BMP280 Sensor Not Found!\n");
+		#endif
         return 0;
     }
 }
 
 void read_calibration_registers(void){
+	#ifdef DEBUG
 	printk("I\t calib[0]\t calib[1]\t final_temperature\t Register\n");
+	#endif
 
 	// For loop tp get the unsigned data dig_T1 and dig_P1.
 	for(int i=0;i<2;i++){
@@ -42,7 +48,9 @@ void read_calibration_registers(void){
 	for(int i=0;i<10;i++){
 	i2c_burst_read(dev_i2c,BMP280_ADDR,calib_signed_registers[i],&calib_data[0],2);
 	calib_data_signed_registers[i] = ((int16_t)((int16_t)(calib_data[1]))<<8 | ((int16_t)(calib_data[0])));
+	#ifdef DEBUG
 	printk("%d\t %d\t %d\t %d\t %x\n",i,calib_data[0],calib_data[1],calib_data_signed_registers[i],calib_signed_registers[i]);
+	#endif
 	calib_data[0]=0;calib_data[1]=0;
 	}
 }
