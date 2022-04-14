@@ -13,7 +13,7 @@ static inline void udelay(int secs){
 
 
 uint8_t reset(void){
-	int key = irq_lock();
+	// int key = irq_lock();
 	uint8_t r;
 	gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
 	gpio_pin_set(dev_ds18b20,LED1_PIN,LOW);
@@ -27,7 +27,7 @@ uint8_t reset(void){
 	gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_INPUT);
 	r = gpio_pin_get(dev_ds18b20,LED1_PIN);
 	udelay(410);
-	irq_unlock(key);
+	// irq_unlock(key);
 	return !r;
 }
 

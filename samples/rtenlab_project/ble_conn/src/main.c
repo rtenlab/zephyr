@@ -33,11 +33,12 @@
 // #include "bme680/bme680.h"
 // #include "blinky/blink.c"
 
+
 #define SHT31
 #define APDS9960
 #define BMP280
 #define LSM6DS33
-#define SCD41
+// #define SCD41
 // #define DS18B20
 // #define BME680
 #define BLE
@@ -416,7 +417,9 @@ void lsm6ds33_notify(void){
 
 void scd41_notify(void){
 	static scd41_t sensor_value;
+	printk("Called Measure single shot function call\n");
 	measure_single_shot(&sensor_value);
+	printk("Done with the Measure Single shot call\n");
 	uint16_t Co2 = sensor_value.Co2;
 	uint16_t temp, hum;
 	temp = (uint16_t)(sensor_value.temp*100);
@@ -513,15 +516,18 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
+	// Not sure if this is needed!
 	int8_t err = bt_conn_disconnect(conn, 2);
+	printk("Disconnected call returned with %d\n", err);
 	if(err){
 		led_on_blink1(true);
 		k_busy_wait(10000000);
 		led_on_blink1(false);
 	}
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
+	if(err){
 		printk("Advertising failed to start (err %d)\n", err);
-	printk("Advertising with Connectable\n");
+	}
 	printk("Disconnected (reason 0x%02x)\n", reason);
 	return;
 }
@@ -540,10 +546,12 @@ static void bt_ready(void)
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);
+		// LOG_ERR("Advertising failed to start (err %d)\n", err);
 		return;
 	}
 
 	printk("Advertising successfully started\n");
+	// LOG_WRN("Advertising Starteed Successfully\n");
 }
 
 
@@ -566,8 +574,9 @@ void main(void)
 
 	bt_conn_cb_register(&conn_callbacks);
 	printk("Call backs registered\n");
+	// LOG_INF("Call backs registered!!!\n");
 #endif	
-	printk("Badhu chalu to thai gayu\n");
+
 #ifdef APDS9960
 	enable_apds_sensor();
 #endif
@@ -595,33 +604,50 @@ extern const struct device *dev_ds18b20;
 	}
 	DallasTemperature_begin();
 #endif
-printk("Reached: Just before the while loop\n");
+
     while (1) {
-		printk("Sending data currently at the start of the loop!!!");
+		printk("Sending data currently at the start of the loop!!!\n");
+		// LOG_INF("Sending data currently at the start of the loop!!!\n");
 
 #ifdef SHT31
         sht_notify();
+		printk("SHT Notified!!!\n");
+		// LOG_INF("SHT Notified!!!\n");
 #endif
 
 #ifdef APDS9960
 		apds9960_notify();
+		printk("APDS Notified!!!\n");
+		// LOG_INF("APDS Notified!!!\n");
+
 #endif
 
 #ifdef BMP280
 		bmp280_notify();
+		printk("BMP Notified!!!\n");
+		// LOG_INF("BMP Notified!!!\n");
 #endif
 
 #ifdef LSM6DS33
 		lsm6ds33_notify();
+		printk("LSM Notified!!!\n");
+		// LOG_INF("LSM Notified!!!\n");
+
 #endif
+
 #ifdef SCD41
 		scd41_notify();
+		printk("SCD Notified!!!\n");
+		// LOG_INF("SCD Notified!!!\n");
 #endif
 #ifdef DS18B20
 		ds18b_notify();
+		printk("DS Notified!!!\n");
+		// LOG_INF("DS Notified!!!\n");
 #endif
 #ifdef BME680
 		bme680_notify(true);
 #endif
+		delay(500);
     }
 }
