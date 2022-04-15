@@ -14,7 +14,7 @@ target_sources(app PRIVATE
   src/scd/scd41.c
   src/ds/Onewire.c
   src/ds/Dallas_temperature.c
-  #src/bme680/bme680.c
+  src/bme680/bme680.c
   src/blinky/blink.c
 )
 

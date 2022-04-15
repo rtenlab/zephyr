@@ -30,17 +30,16 @@
 #include "scd/scd41.h"
 #include "ds/Onewire.h"
 #include "ds/Dallas_temperature.h"
-// #include "bme680/bme680.h"
-// #include "blinky/blink.c"
+#include "bme680/bme680.h"
 
 
 #define SHT31
 #define APDS9960
 #define BMP280
 #define LSM6DS33
-// #define SCD41
-// #define DS18B20
-// #define BME680
+#define SCD41
+#define DS18B20
+#define BME680
 #define BLE
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
@@ -54,6 +53,8 @@
 #define CPF_UNIT_ACCEL 		0x2713
 #define CPF_UNIT_ANG_VEL	0x2743
 #define CPF_UNIT_ELEC_RES		0x272A
+
+volatile bool BLE_isConnected = false;
 
 #ifdef SHT31
 
@@ -119,10 +120,6 @@ static struct bt_uuid_128 scd41_CO2_uuid = BT_UUID_INIT_128(
 //@brief  UUID for clear_als apds sensor data: 8121b46f-56ce-487f-9084-5330700681d5
 static struct bt_uuid_128 ds18b_primary_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0x8121b46f, 0x56ce, 0x487f, 0x9084, 0x5330700681d5));
-
-//@brief  UUID for clear_als apds sensor data: 9dbd0e19-372d-4c7e-a1cb-9a6a8e75bf0f
-static struct bt_uuid_128 ds18b_temp_uuid = BT_UUID_INIT_128(
-	BT_UUID_128_ENCODE(0x9dbd0e19, 0x372d, 0x4c7e, 0xa1cb, 0x9a6a8e75bf0f));
 #endif
 
 #ifdef BME680
@@ -147,14 +144,6 @@ static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value
 }
 
 #ifdef APDS9960
-/**
- * @brief  Struct bt_gatt_cpf to construct the charactersitics presentation format.
- * @note   PROXIMITY data is only 8 bits long and the unit is not specified in the data sheet.
- */
-static const struct bt_gatt_cpf proximity = {
-	.format = CPF_FORMAT_UINT8,
-	.unit = CPF_UNIT_NO_UNIT,
-};
 
 /**
  * @brief  Struct bt_gatt_cpf to construct the charactersitics presentation format.
@@ -177,10 +166,6 @@ static const struct bt_gatt_cpf accel = {
 	.unit = CPF_UNIT_ACCEL,
 };
 
-static const struct bt_gatt_cpf gyro = {
-	.format = CPF_FORMAT_UINT16,
-	.unit = CPF_UNIT_ANG_VEL,
-};
 #endif
 
 #ifdef BME680
@@ -368,11 +353,9 @@ void sht_notify(void)
 void apds9960_notify(void)
 {
 	static apds9960_t sensor_value;
-	uint8_t prox;
-	int16_t red, green, blue, clear;
+	int16_t clear;
 	read_als_data(&sensor_value);
 	clear = sensor_value.clear;
-
 	bt_gatt_notify(NULL, &ess_svc.attrs[8], &sensor_value.clear, sizeof(sensor_value.clear));
 	return;
 }
@@ -396,7 +379,7 @@ void bmp280_notify(void){
 #ifdef LSM6DS33
 void lsm6ds33_notify(void){
 	static lsm6ds33_t sensor_value;
-	int16_t gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
+	int16_t accelX, accelY, accelZ;
 	read_burst_data(&sensor_value);
 
 	accelX = (int16_t)((sensor_value.accelX)*100+32768);
@@ -437,7 +420,6 @@ void ds18b_notify(void){
 	volatile uint8_t n_devices = getDeviceCount();
 	static float sensor_value;
 	requestTemperatures();
-	uint8_t index;
 	static uint16_t some[5];	
 
 	for(int i=0; i<n_devices; i++){
@@ -507,6 +489,8 @@ static const struct bt_data ad[] = {
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
+	BLE_isConnected=true;
+	printk("_isConnected set to: %d\n", BLE_isConnected);
 	if (err) {
 		printk("Connection failed (err 0x%02x)\n", err);
 	} else {
@@ -516,13 +500,15 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
+	BLE_isConnected=false;
+	printk("_isConnected set to: %d\n", BLE_isConnected);
 	// Not sure if this is needed!
 	int8_t err = bt_conn_disconnect(conn, 2);
-	printk("Disconnected call returned with %d\n", err);
 	if(err){
-		led_on_blink1(true);
-		k_busy_wait(10000000);
-		led_on_blink1(false);
+		printk("Disconnected call returned with %d\n", err);
+		// led_on_blink1(true);
+		// k_busy_wait(10000000);
+		// led_on_blink1(false);
 	}
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if(err){
@@ -553,6 +539,7 @@ static void bt_ready(void)
 	printk("Advertising successfully started\n");
 	// LOG_WRN("Advertising Starteed Successfully\n");
 }
+
 
 
 void main(void)
@@ -606,48 +593,50 @@ extern const struct device *dev_ds18b20;
 #endif
 
     while (1) {
-		printk("Sending data currently at the start of the loop!!!\n");
-		// LOG_INF("Sending data currently at the start of the loop!!!\n");
+		if(BLE_isConnected){
+			printk("Sending data currently at the start of the loop!!!\n");
+			// LOG_INF("Sending data currently at the start of the loop!!!\n");
 
-#ifdef SHT31
-        sht_notify();
-		printk("SHT Notified!!!\n");
-		// LOG_INF("SHT Notified!!!\n");
-#endif
+	#ifdef SHT31
+			sht_notify();
+			printk("SHT Notified!!!\n");
+			// LOG_INF("SHT Notified!!!\n");
+	#endif
 
-#ifdef APDS9960
-		apds9960_notify();
-		printk("APDS Notified!!!\n");
-		// LOG_INF("APDS Notified!!!\n");
+	#ifdef APDS9960
+			apds9960_notify();
+			printk("APDS Notified!!!\n");
+			// LOG_INF("APDS Notified!!!\n");
 
-#endif
+	#endif
 
-#ifdef BMP280
-		bmp280_notify();
-		printk("BMP Notified!!!\n");
-		// LOG_INF("BMP Notified!!!\n");
-#endif
+	#ifdef BMP280
+			bmp280_notify();
+			printk("BMP Notified!!!\n");
+			// LOG_INF("BMP Notified!!!\n");
+	#endif
 
-#ifdef LSM6DS33
-		lsm6ds33_notify();
-		printk("LSM Notified!!!\n");
-		// LOG_INF("LSM Notified!!!\n");
+	#ifdef LSM6DS33
+			lsm6ds33_notify();
+			printk("LSM Notified!!!\n");
+			// LOG_INF("LSM Notified!!!\n");
 
-#endif
+	#endif
 
-#ifdef SCD41
-		scd41_notify();
-		printk("SCD Notified!!!\n");
-		// LOG_INF("SCD Notified!!!\n");
-#endif
-#ifdef DS18B20
-		ds18b_notify();
-		printk("DS Notified!!!\n");
-		// LOG_INF("DS Notified!!!\n");
-#endif
-#ifdef BME680
-		bme680_notify(true);
-#endif
-		delay(500);
-    }
-}
+	#ifdef SCD41
+			scd41_notify();
+			printk("SCD Notified!!!\n");
+			// LOG_INF("SCD Notified!!!\n");
+	#endif
+	#ifdef DS18B20
+			ds18b_notify();
+			printk("DS Notified!!!\n");
+			// LOG_INF("DS Notified!!!\n");
+	#endif
+	#ifdef BME680
+			bme680_notify(true);
+	#endif
+			delay(500);
+		}//End of if
+	}// End of while
+}// End of main
