@@ -133,11 +133,12 @@ BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
 
 #endif
 
+static bool notif_enabled;
 static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
 	ARG_UNUSED(attr);
 
-	bool notif_enabled = (value == BT_GATT_CCC_NOTIFY);
+	notif_enabled = (value == BT_GATT_CCC_NOTIFY);
     notif_enabled ? "enabled" : "disabled";
 
 	// LOG_INF("HRS notifications %s", notif_enabled ? "enabled" : "disabled");
@@ -593,7 +594,8 @@ extern const struct device *dev_ds18b20;
 #endif
 
     while (1) {
-		if(BLE_isConnected){
+		if(BLE_isConnected){// Wait untill we have BLE_isCONNECTED as true.
+		// while(!notif_enabled){;}
 			printk("Sending data currently at the start of the loop!!!\n");
 			// LOG_INF("Sending data currently at the start of the loop!!!\n");
 
@@ -636,7 +638,7 @@ extern const struct device *dev_ds18b20;
 	#ifdef BME680
 			bme680_notify(true);
 	#endif
-			delay(500);
+			// k_sleep(K_MINUTES(10));
 		}//End of if
 	}// End of while
 }// End of main

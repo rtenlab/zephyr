@@ -6,4 +6,5 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(hello_world)
 
 target_sources(app PRIVATE src/main.c
-                            src/uart_i2c.c)
+                            src/uart_i2c.c
+                            src/sht31.c)
