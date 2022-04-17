@@ -113,25 +113,44 @@ void sht_notify(void)
 
 
 
-// struct k_mutex my_mutex;
-// void my_entry_point(void* a, void* b, void* c){
-// 	ARG_UNUSED(a);
-// 	ARG_UNUSED(b);
-// 	ARG_UNUSED(c);
-// 	k_tid_t some=k_current_get();
-// 	int prio = k_thread_priority_get(some);
-// 	while(1){
-// 		if(k_mutex_lock(&my_mutex, K_FOREVER)!=0)
-// 			printk("Unable to get the mutex lock for thread with prio: %d\n",prio);
-// 		printk("Hello from the only thread %d!!!\n", prio);
-// 		delay(1000);
-// 		k_mutex_unlock(&my_mutex);
-// 	}
-// }
-// K_THREAD_STACK_DEFINE(my_stack_area1, MY_STACK_SIZE);
-// K_THREAD_STACK_DEFINE(my_stack_area2, MY_STACK_SIZE);
-// // K_THREAD_STACK_DEFINE(my_stack_area3, MY_STACK_SIZE);
-// struct k_thread my_thread_data[THREAD_COUNT];
+struct k_mutex my_mutex;
+void my_entry_point(void* a, void* b, void* c){
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+	k_tid_t some=k_current_get();
+	int prio = k_thread_priority_get(some);
+	while(1){
+		if(k_mutex_lock(&my_mutex, K_FOREVER)!=0)
+			printk("Unable to get the mutex lock for thread with prio: %d\n",prio);
+		printk("Hello from the only thread %d!!!\n", prio);
+		delay(1000);
+		k_mutex_unlock(&my_mutex);
+	}
+}
+K_THREAD_STACK_DEFINE(my_stack_area1, MY_STACK_SIZE);
+K_THREAD_STACK_DEFINE(my_stack_area2, MY_STACK_SIZE);
+// K_THREAD_STACK_DEFINE(my_stack_area3, MY_STACK_SIZE);
+struct k_thread my_thread_data[THREAD_COUNT];
+
+#ifdef APDS9960
+
+/**
+ * @brief  Notify the client the change in the proximity and ALS sensor value.
+ */
+void apds9960_notify(void)
+{
+	static apds9960_t sensor_value;
+	int16_t clear;
+	read_als_data(&sensor_value);
+	clear = sensor_value.clear;
+	k_sleep(K_MSEC(500));
+	bt_gatt_notify(NULL, &ess_svc.attrs[8], &sensor_value.clear, sizeof(sensor_value.clear));
+	k_sleep(K_MSEC(500));
+	printk("APDS Notified!!!\n");
+	return;
+}
+#endif
 
 
 static const struct bt_data ad[] = {
@@ -181,35 +200,23 @@ void main(void){
 	// enable_uart_console();
 	configure_device();
 	    int err;
-	// enable_uart_console();
-	err = bt_enable(NULL);
-	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
-		return;
-	}
+	enable_uart_console();
 
-	bt_ready();
 
-	bt_conn_cb_register(&conn_callbacks);
-	printk("Badhu chalu to thai gayu\n");
+	k_mutex_init(&my_mutex);	
+	k_tid_t my_tid = k_thread_create(&my_thread_data[0], my_stack_area1, 
+											K_THREAD_STACK_SIZEOF(my_stack_area1),
+											my_entry_point, 
+											NULL, NULL, NULL,
+											MY_PRIORITY_1, 0, K_NO_WAIT);
+	printk("TID for 1st thread: %d\n", my_tid);
 
-	// k_mutex_init(&my_mutex);	
-	// k_tid_t my_tid = k_thread_create(&my_thread_data[0], my_stack_area1, 
-	// 										K_THREAD_STACK_SIZEOF(my_stack_area1),
-	// 										my_entry_point, 
-	// 										NULL, NULL, NULL,
-	// 										MY_PRIORITY_1, 0, K_NO_WAIT);
-	// printk("TID for 1st thread: %d\n", my_tid);
-	while(1){
-		delay(1000);
-		sht_notify();
-	}
-	// my_tid = k_thread_create(&my_thread_data[1], my_stack_area2, 
-	// 										K_THREAD_STACK_SIZEOF(my_stack_area2),
-	// 										my_entry_point, 
-	// 										NULL, NULL, NULL,
-	// 										MY_PRIORITY_2, 0, K_NO_WAIT);
-	// printk("TID for 2nd thread: %d\n", my_tid);
+	my_tid = k_thread_create(&my_thread_data[1], my_stack_area2, 
+											K_THREAD_STACK_SIZEOF(my_stack_area2),
+											my_entry_point, 
+											NULL, NULL, NULL,
+											MY_PRIORITY_2, 0, K_NO_WAIT);
+	printk("TID for 2nd thread: %d\n", my_tid);
 	// my_tid = k_thread_create(&my_thread_data[2], my_stack_area3, 
 	// 										K_THREAD_STACK_SIZEOF(my_stack_area3),
 	// 										my_entry_point, 

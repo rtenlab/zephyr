@@ -39,7 +39,7 @@
 #define LSM6DS33
 #define SCD41
 #define DS18B20
-#define BME680
+// #define BME680
 #define BLE
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
@@ -133,13 +133,13 @@ BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
 
 #endif
 
-static bool notif_enabled;
+volatile bool notif_enabled;
 static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
 	ARG_UNUSED(attr);
-
+	// printk("hrmc_ccc_cfg_changed: This function was called and hence notifications should be ON!!!\n");
 	notif_enabled = (value == BT_GATT_CCC_NOTIFY);
-    notif_enabled ? "enabled" : "disabled";
+    // notif_enabled ? "enabled" : "disabled";
 
 	// LOG_INF("HRS notifications %s", notif_enabled ? "enabled" : "disabled");
 }
@@ -342,7 +342,10 @@ void sht_notify(void)
     temp_value = (uint16_t)((sensor_value.temp)*100);
 	hum_value = (uint16_t)((sensor_value.humidity)*100);
     bt_gatt_notify(NULL, &ess_svc.attrs[1], &temp_value, sizeof(temp_value));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[4], &hum_value, sizeof(hum_value));
+	k_sleep(K_MSEC(500));
+	printk("SHT Notified!!!\n");
 }
 #endif
 
@@ -357,7 +360,10 @@ void apds9960_notify(void)
 	int16_t clear;
 	read_als_data(&sensor_value);
 	clear = sensor_value.clear;
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[8], &sensor_value.clear, sizeof(sensor_value.clear));
+	k_sleep(K_MSEC(500));
+	printk("APDS Notified!!!\n");
 	return;
 }
 #endif
@@ -371,8 +377,12 @@ void bmp280_notify(void){
 	bmp_read_press_temp_data(&sensor_value);
 	temperature = (uint16_t)((sensor_value.temperature)*100);
 	pressure= (uint32_t)((sensor_value.pressure)*10);
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[13], &temperature, sizeof(temperature));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[16], &pressure, sizeof(pressure));
+	k_sleep(K_MSEC(500));
+	printk("BMP Notified!!!\n");
 	return;
 }
 #endif
@@ -380,18 +390,54 @@ void bmp280_notify(void){
 #ifdef LSM6DS33
 void lsm6ds33_notify(void){
 	static lsm6ds33_t sensor_value;
-	int16_t accelX, accelY, accelZ;
-	read_burst_data(&sensor_value);
+	float accelX, accelY, accelZ;
+	int16_t totalX, totalY, totalZ, count=0;
+	int16_t finalX=0, finalY=0, finalZ=0;
+	
+		// Initialize the sensor by setting necessary parameters for gyroscope and accelerometer
+	lsm6ds33_init();
 
-	accelX = (int16_t)((sensor_value.accelX)*100+32768);
-	accelY = (int16_t)((sensor_value.accelY)*100+32768);
-	accelZ = (int16_t)((sensor_value.accelZ)*100+32768);
+	accel_set_power_mode(ACCEL_LOW_POWER_MODE);
+	gyro_set_power_mode(GYRO_LOW_POWER_MODE);
+
+	printk("Waiting for watermark...\nIf you want to see some changes in the readings change the orientation of the board right now!!!\n");
+
+		//  Check if the FIFO_FULL Flag is set or not.
+	while((lsm6ds33_fifo_status() & FIFO_FULL) == 0) { };
+
+	count =0; totalX=0; totalY=0; totalZ=0;
+	while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
+		accelX = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+		totalX +=accelX;
+		printk("AccelX_Raw: %f\n", accelX);
+		accelY = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+		totalY +=accelY;
+		printk("AccelY_Raw: %f\n", accelY);
+		accelZ = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+		totalZ +=accelZ;
+		printk("AccelZ_Raw: %f\n", accelZ);
+		count++;
+		// printk("AccelX_Raw: %f\n", accelX);
+		// printk("AccelY_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+		// printk("AccelZ_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+		delay(50);
+	}
+	lsm6ds33_fifo_change_mode(0);
 
 
-	bt_gatt_notify(NULL, &ess_svc.attrs[20], &accelX, sizeof(accelX));
-	bt_gatt_notify(NULL, &ess_svc.attrs[24], &accelY, sizeof(accelY));
-	bt_gatt_notify(NULL, &ess_svc.attrs[28], &accelZ, sizeof(accelZ));
 
+	finalX = (int16_t)((totalX/count)*100+32768);
+	finalY = (int16_t)((totalY/count)*100+32768);
+	finalZ = (int16_t)((totalZ/count)*100+32768);
+
+	k_sleep(K_MSEC(500));
+	bt_gatt_notify(NULL, &ess_svc.attrs[20], &finalX, sizeof(finalX));
+	k_sleep(K_MSEC(500));
+	bt_gatt_notify(NULL, &ess_svc.attrs[24], &finalY, sizeof(finalY));
+	k_sleep(K_MSEC(500));
+	bt_gatt_notify(NULL, &ess_svc.attrs[28], &finalZ, sizeof(finalZ));
+	printk("LSM Notified");
+	k_sleep(K_MSEC(500));
 	return;
 }
 #endif
@@ -408,9 +454,14 @@ void scd41_notify(void){
 	uint16_t temp, hum;
 	temp = (uint16_t)(sensor_value.temp*100);
 	hum = (uint16_t)(sensor_value.hum*100);
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[33], &Co2, sizeof(Co2));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[37], &hum, sizeof(hum));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[40], &temp, sizeof(temp));
+	k_sleep(K_MSEC(500));
+	printk("SCD Notified!!!\n");
 }
 
 #endif
@@ -429,11 +480,15 @@ void ds18b_notify(void){
 		delay(10);
 	}
 	bt_gatt_notify(NULL, &ess_svc.attrs[44], &some[0], sizeof(some[0]));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[47], &some[1], sizeof(some[0]));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[50], &some[2], sizeof(some[0]));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[53], &some[3], sizeof(some[0]));
+	k_sleep(K_MSEC(500));
 	bt_gatt_notify(NULL, &ess_svc.attrs[56], &some[4], sizeof(some[0]));
-
+	printk("DS Notified!!!\n");
 	return;
 
 }
@@ -508,7 +563,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	if(err){
 		printk("Disconnected call returned with %d\n", err);
 		// led_on_blink1(true);
-		// k_busy_wait(10000000);
+		// k_busy_wait(5000000);
 		// led_on_blink1(false);
 	}
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
@@ -595,50 +650,35 @@ extern const struct device *dev_ds18b20;
 
     while (1) {
 		if(BLE_isConnected){// Wait untill we have BLE_isCONNECTED as true.
-		// while(!notif_enabled){;}
+		while(!notif_enabled){;}
 			printk("Sending data currently at the start of the loop!!!\n");
-			// LOG_INF("Sending data currently at the start of the loop!!!\n");
-
 	#ifdef SHT31
 			sht_notify();
-			printk("SHT Notified!!!\n");
-			// LOG_INF("SHT Notified!!!\n");
 	#endif
 
 	#ifdef APDS9960
 			apds9960_notify();
-			printk("APDS Notified!!!\n");
-			// LOG_INF("APDS Notified!!!\n");
-
 	#endif
 
 	#ifdef BMP280
 			bmp280_notify();
-			printk("BMP Notified!!!\n");
-			// LOG_INF("BMP Notified!!!\n");
 	#endif
 
 	#ifdef LSM6DS33
 			lsm6ds33_notify();
-			printk("LSM Notified!!!\n");
-			// LOG_INF("LSM Notified!!!\n");
 
 	#endif
 
 	#ifdef SCD41
 			scd41_notify();
-			printk("SCD Notified!!!\n");
-			// LOG_INF("SCD Notified!!!\n");
 	#endif
 	#ifdef DS18B20
 			ds18b_notify();
-			printk("DS Notified!!!\n");
-			// LOG_INF("DS Notified!!!\n");
 	#endif
 	#ifdef BME680
 			bme680_notify(true);
 	#endif
-			// k_sleep(K_MINUTES(10));
+		k_sleep(K_MINUTES(2));
 		}//End of if
 	}// End of while
 }// End of main

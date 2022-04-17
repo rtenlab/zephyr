@@ -48,7 +48,23 @@
 // K_SEM_DEFINE(threadA_sem, 1, 1);	/* starts off "available" */
 // K_SEM_DEFINE(threadB_sem, 0, 1);	/* starts off "not available" */
 
+typedef struct {
+	// id->0: sht data; id->1: apds data
+	uint8_t id;
+	union 
+	{
+		// scd41_t scd41_data;
+		sht31_t sht31_data;
+		// lsm6ds33_t lsm6ds33_data;
+		// bmp280_t bmp280_data;
+		apds9960_t apds_cls_data;
+		// int16_t ds18b20_temp_data;
+	};
+}ble_data_t;
+
+
 struct k_mutex mymutex;
+ble_data_t shared_buffer[10];
 
 void scd41(void *dummy1, void *dummy2, void* dummy3)
 {
@@ -70,24 +86,30 @@ void scd41(void *dummy1, void *dummy2, void* dummy3)
 
 }
 
+
+
+
 void apds9960(void *dummy1, void *dummy2, void *dummy3)
 {
 	ARG_UNUSED(dummy1);
 	ARG_UNUSED(dummy2);
 	ARG_UNUSED(dummy3);
 	struct k_thread *current_thread;
-	apds9960_t threadC_apds9960;
+	// apds9960_t threadC_apds9960;
 	current_thread = k_current_get();
-	while(1){
 		// Write something to start another sensor.
+	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
 		printk("Hello from %s\n", k_thread_name_get(current_thread));
-		read_proximity_data(&threadC_apds9960);
-		read_als_data(&threadC_apds9960);
-		print_data_apds(&threadC_apds9960);
+		// read_proximity_data(&threadC_apds9960);
+		read_als_data(&shared_buffer[1].apds_cls_data);
+		print_data_apds(&shared_buffer[1].apds_cls_data);
 		k_msleep(SLEEPTIME);
 		k_mutex_unlock(&mymutex);
+		k_sleep(K_FOREVER);
 	}
+	
+	return;
 }
 
 
@@ -121,16 +143,17 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	ARG_UNUSED(dummy3);
 	/* invoke routine to ping-pong hello messages with threadB */
 	while(1){
-	sht31_t threadA_sht31;
-	struct k_thread *current_thread;
-	current_thread = k_current_get();
-	k_mutex_lock(&mymutex, K_FOREVER);
-	printk("Hello from %s\n", k_thread_name_get(current_thread));
-	k_msleep(SLEEPTIME);
-	read_temp_hum(&threadA_sht31);
-	print_data_sht(&threadA_sht31);
-	k_mutex_unlock(&mymutex);
+		struct k_thread *current_thread;
+		current_thread = k_current_get();
+		k_mutex_lock(&mymutex, K_FOREVER);
+		printk("Hello from %s\n", k_thread_name_get(current_thread));
+		k_msleep(SLEEPTIME);
+		read_temp_hum(&shared_buffer[1].sht31_data);
+		print_data_sht(&shared_buffer[1].sht31_data);
+		k_mutex_unlock(&mymutex);
+		k_sleep(K_FOREVER);
 	}
+	return;
 }
 
 
@@ -147,6 +170,30 @@ K_THREAD_STACK_DEFINE(scd41_stack_area, STACKSIZE);
 static struct k_thread scd41_data;
 
 
+/**
+ * @brief  Work Handler function. This will be ran by a thread in backend depending on the priority.
+ * @note   
+ * @param  struct k_work*: What wok needs to be done.
+ * @retval None
+ */
+void my_work_handler(struct k_work *work){
+	k_thread_resume(&sht31_data);
+	// k_thread_start(&lsm6ds33_data);
+	k_thread_resume(&apds9960_data);
+}
+
+// Define a work and it's work handler
+K_WORK_DEFINE(my_work, my_work_handler);
+
+// Define a function that will be called when a timer expires.
+void my_timer_handler(struct k_timer* dummy){
+	k_work_submit(&my_work);
+}
+// Define a timer.
+K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
+
+
+volatile uint8_t count;
 void main(void)
 {  
 	enable_uart_console();
@@ -155,33 +202,37 @@ void main(void)
 	enable_apds_sensor();
 	k_mutex_init(&mymutex);
 	printk("Number of CPUS: %d\n", CONFIG_MP_NUM_CPUS);
+
 	k_thread_create(&sht31_data, sht31_stack_area,
 			K_THREAD_STACK_SIZEOF(sht31_stack_area),
 			sht31, NULL, NULL, NULL,
-			PRIORITY, 0, K_FOREVER);
+			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&sht31_data, "thread_A");
 
-	k_thread_create(&lsm6ds33_data, lsm6ds33_stack_area,
-			K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
-			lsm6ds33, NULL, NULL, NULL,
-			PRIORITY, 0, K_FOREVER);
-	k_thread_name_set(&lsm6ds33_data, "thread_B");
+
 
 	k_thread_create(&apds9960_data, apds9960_stack_area, 
 			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
 			apds9960, NULL, NULL, NULL, 
-			PRIORITY, 0, K_FOREVER);
+			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&apds9960_data, "thread_C");
 
-	k_thread_create(&scd41_data, scd41_stack_area, 
-			K_THREAD_STACK_SIZEOF(scd41_stack_area), 
-			scd41, NULL, NULL, NULL,
-			PRIORITY, 0, K_FOREVER);
-	k_thread_name_set(&scd41_data, "thread_D");
+
+	// k_thread_create(&lsm6ds33_data, lsm6ds33_stack_area,
+	// 		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
+	// 		lsm6ds33, NULL, NULL, NULL,
+	// 		PRIORITY, 0, K_FOREVER);
+	// k_thread_name_set(&lsm6ds33_data, "thread_B");
+
+	// k_thread_create(&scd41_data, scd41_stack_area, 
+	// 		K_THREAD_STACK_SIZEOF(scd41_stack_area), 
+	// 		scd41, NULL, NULL, NULL,
+	// 		PRIORITY, 0, K_FOREVER);
+	// k_thread_name_set(&scd41_data, "thread_D");
+
+	k_timer_start(&my_timer, K_SECONDS(2), K_SECONDS(4));
 
 
-	k_thread_start(&sht31_data);
-	k_thread_start(&lsm6ds33_data);
-	k_thread_start(&apds9960_data);
+	
 	// k_thread_start(&scd41_data);
 }
