@@ -16,6 +16,7 @@
 #include "lsm6ds33.c"
 #include "apds9960.c"
 #include "scd41.c"
+#include "bmp280.h"
 
 
 
@@ -61,12 +62,13 @@ enum data_type{
 typedef struct {
 	// id->0: sht data; id->1: apds data
 	enum data_type type;
+	uint32_t time_stamp;
 	union 
 	{
 		// scd41_t scd41_data;
 		sht31_t sht31_data;
-		// lsm6ds33_t lsm6ds33_data;
-		// bmp280_t bmp280_data;
+		lsm6ds33_t lsm6ds33_data;
+		bmp280_t bmp280_data;
 		apds9960_t apds_cls_data;
 		// int16_t ds18b20_temp_data;
 	};
@@ -77,7 +79,7 @@ struct k_mutex mymutex;
 
 /* Create a MSG Queue for the threads to use for data passing*/
 // struct k_msgq my_msgq;
-K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 3, 4);
+K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 4, 4);
 
 void apds9960(void *dummy1, void *dummy2, void *dummy3)
 {
@@ -87,29 +89,24 @@ void apds9960(void *dummy1, void *dummy2, void *dummy3)
 	struct k_thread *current_thread;
 	// apds9960_t threadC_apds9960;
 	current_thread = k_current_get();
-		// Write something to start another sensor.
-		ble_data_t apds_local_data;
-		apds_local_data.type = SENSOR_APDS9960;
+	// Write something to start another sensor.
+	ble_data_t apds_local_data;
+	apds_local_data.type = SENSOR_APDS9960;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
-		printk("Hello from %s\n", k_thread_name_get(current_thread));
-		// read_proximity_data(&threadC_apds9960);
+		read_proximity_data(&apds_local_data.apds_cls_data);
 		read_als_data(&apds_local_data.apds_cls_data);
+		apds_local_data.time_stamp = k_cycle_get_32();
+		printk("[%d] Hello from %s\n", apds_local_data.time_stamp,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
-		// print_data_apds(&shared_buffer[1].apds_cls_data);
-		k_msleep(SLEEPTIME);
+		printk("APDS Ended!!!\n");
 		k_mutex_unlock(&mymutex);
 		k_sleep(K_FOREVER);
-	}
-	
+	}	
 	return;
 }
 
-
-
-
 /* threadA is a static thread that is spawned automatically */
-
 void sht31(void *dummy1, void *dummy2, void *dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -122,15 +119,77 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	sht31_local_data.type = SENSOR_SHT31;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
-		printk("Hello from %s\n", k_thread_name_get(current_thread));
-		k_msleep(SLEEPTIME);
 		read_temp_hum(&sht31_local_data.sht31_data);
+		sht31_local_data.time_stamp = k_cycle_get_32();
+		printk("[%d] Hello from %s\n", sht31_local_data.time_stamp,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &sht31_local_data, K_FOREVER);
-		// print_data_sht(&shared_buffer[1].sht31_data);
+		printk("SHT Ended!!!\n");
 		k_mutex_unlock(&mymutex);
 		k_sleep(K_FOREVER);
 	}
 	return;
+}
+
+void bmp280(void* dummy1, void* dummy2, void* dummy3){
+	ARG_UNUSED(dummy1);
+	ARG_UNUSED(dummy2);
+	ARG_UNUSED(dummy3);
+	read_calibration_registers();
+	struct k_thread *current_thread;
+	current_thread = k_current_get();
+	ble_data_t bmp280_local_data;
+	bmp280_local_data.type = SENSOR_BMP280;
+	while(1){
+		k_mutex_lock(&mymutex, K_FOREVER);
+		bmp_read_press_temp_data(&bmp280_local_data.bmp280_data);
+		bmp280_local_data.time_stamp = k_cycle_get_32();
+		printk("[%d] Hello from %s\n", bmp280_local_data.time_stamp,k_thread_name_get(current_thread));
+		k_msgq_put(&my_msgq, &bmp280_local_data, K_FOREVER);
+		printk("BMP Ended!!!\n");
+		k_mutex_unlock(&mymutex);
+		k_sleep(K_FOREVER);
+	}
+}
+
+void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
+	ARG_UNUSED(dummy1);
+	ARG_UNUSED(dummy2);
+	ARG_UNUSED(dummy3);
+	struct k_thread* current_thread;
+	current_thread = k_current_get();
+	ble_data_t lsm6ds33_local_data;
+	lsm6ds33_local_data.type = SENSOR_LSM6DS33;
+	float accelX, accelY, accelZ;	
+	// Initialize the sensor by setting necessary parameters for gyroscope and accelerometer
+	accel_set_power_mode(ACCEL_LOW_POWER_MODE);
+	gyro_set_power_mode(GYRO_LOW_POWER_MODE);
+	//  Check if the FIFO_FULL Flag is set or not.
+	while(1){
+		k_mutex_lock(&mymutex, K_FOREVER);
+		while((lsm6ds33_fifo_status() & FIFO_FULL) == 0) { };
+		while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
+			accelX = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+			lsm6ds33_local_data.lsm6ds33_data.accelX = accelX;
+			printk("AccelX_Raw: %f\n", accelX);
+			accelY = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+			lsm6ds33_local_data.lsm6ds33_data.accelY = accelY;
+			printk("AccelY_Raw: %f\n", accelY);
+			accelZ = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+			lsm6ds33_local_data.lsm6ds33_data.accelZ = accelZ;
+			printk("AccelZ_Raw: %f\n", accelZ);
+			lsm6ds33_local_data.time_stamp = k_cycle_get_32();
+			printk("[%d] Hello from %s\n", lsm6ds33_local_data.time_stamp,k_thread_name_get(current_thread));
+			
+			// printk("AccelX_Raw: %f\n", accelX);
+			// printk("AccelY_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+			// printk("AccelZ_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
+		}
+		k_msgq_put(&my_msgq, &lsm6ds33_local_data, K_FOREVER);
+		lsm6ds33_fifo_change_mode(0);
+		k_sleep(K_FOREVER);
+		k_mutex_unlock(&mymutex);
+		lsm6ds33_fifo_change_mode(1);
+	}
 }
 
 char* enum_to_string(ble_data_t* data){
@@ -140,7 +199,14 @@ char* enum_to_string(ble_data_t* data){
 	else if(data->type == SENSOR_SHT31){
 		return "SHT31";
 	}
-	return "NOT VALID";
+	else if(data->type == SENSOR_BMP280){
+		return "BMP280";
+	}
+	else if(data->type == SENSOR_LSM6DS33){
+		return "LSM6DS33";
+	}
+	
+	return "Not Valid";
 }
 
 void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
@@ -149,13 +215,54 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 	ARG_UNUSED(dummy2);
 	ARG_UNUSED(dummy3);
 	ble_data_t consumer_local_data;
+	uint32_t time=0;
 	while(1){
-		int8_t ret = k_msgq_get(&my_msgq, &consumer_local_data, K_MSEC(10));
-		if(ret!=0){
-			printk("Couldn't find data\n");
-		}
-		printk("Data type: %s\t Data value: (Nothing for now)\n", enum_to_string(&consumer_local_data));
+		uint8_t num_used = k_msgq_num_used_get(&my_msgq);
+		for(int i=0; i<num_used; i++){
+			int8_t ret = k_msgq_get(&my_msgq, &consumer_local_data, K_MSEC(100));
+			if(ret!=0){
+				printk("Couldn't find data\n");
+			}
+			time = k_cycle_get_32();
+			if(consumer_local_data.type == SENSOR_APDS9960)
+				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Prox: %d\t Clear: %d\t Red: %d\t Blue: %d\t Green: %d\n",
+													time,
+													consumer_local_data.time_stamp,
+													enum_to_string(&consumer_local_data),
+													consumer_local_data.apds_cls_data.proximity, 
+														consumer_local_data.apds_cls_data.clear, 
+														consumer_local_data.apds_cls_data.red,
+														consumer_local_data.apds_cls_data.blue, 
+														consumer_local_data.apds_cls_data.green);
+			
+			else if(consumer_local_data.type == SENSOR_SHT31)
+				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Temp: %f\t Humi: %f\n",
+													time, 
+													consumer_local_data.time_stamp,
+													enum_to_string(&consumer_local_data),
+														consumer_local_data.sht31_data.temp, 
+														consumer_local_data.sht31_data.humidity);
+
+			else if(consumer_local_data.type == SENSOR_BMP280)
+				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Temp: %f\t Press: %f\n",
+													time, 
+													consumer_local_data.time_stamp,
+													enum_to_string(&consumer_local_data),
+														consumer_local_data.bmp280_data.temperature, 
+														consumer_local_data.bmp280_data.pressure);
+
+			else if(consumer_local_data.type == SENSOR_LSM6DS33)
+				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t AccelX: %f\t AccelY: %f\t AccelZ: %f\n",
+													time, 
+													consumer_local_data.time_stamp,
+													enum_to_string(&consumer_local_data),
+														consumer_local_data.lsm6ds33_data.accelX, 
+														consumer_local_data.lsm6ds33_data.accelY,
+														consumer_local_data.lsm6ds33_data.accelZ);
+			
+		}// End of if.
 		k_sleep(K_FOREVER);
+
 	}
 
 }
@@ -166,6 +273,12 @@ static struct k_thread sht31_thread_data;
 K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
 static struct k_thread apds9960_thread_data;
 
+K_THREAD_STACK_DEFINE(bmp280_stack_area, STACKSIZE);
+static struct k_thread bmp280_thread_data;
+
+K_THREAD_STACK_DEFINE(lsm6ds33_stack_area, STACKSIZE);
+static struct k_thread lsm6ds33_thread_data;
+
 K_THREAD_STACK_DEFINE(consumer_stack_area, STACKSIZE);
 static struct k_thread consumer_thread_data;
 
@@ -175,22 +288,37 @@ static struct k_thread consumer_thread_data;
  * @param  struct k_work*: What wok needs to be done.
  * @retval None
  */
-void my_work_handler(struct k_work *work){
-	k_thread_resume(&sht31_thread_data);
-	// k_thread_start(&lsm6ds33_data);
-	k_thread_resume(&apds9960_thread_data);
-	k_thread_resume(&consumer_thread_data);
+void producer_work_handler(struct k_work *work){
+	printk("Timer fired!!!\n");
+	k_wakeup(&sht31_thread_data);
+	k_wakeup(&apds9960_thread_data);
+	k_wakeup(&bmp280_thread_data);
+	k_wakeup(&lsm6ds33_thread_data);
 }
 
+void consumer_work_handler(struct k_work * work){
+	printk("Consumer timer Fired!!!\n");
+	k_wakeup(&consumer_thread_data);
+}
 // Define a work and it's work handler
-K_WORK_DEFINE(my_work, my_work_handler);
+K_WORK_DEFINE(producer_work, producer_work_handler);
 
+K_WORK_DEFINE(consumer_work, consumer_work_handler);
 // Define a function that will be called when a timer expires.
-void my_timer_handler(struct k_timer* dummy){
-	k_work_submit(&my_work);
+void producer_timer_handler(struct k_timer* dummy){
+
+	k_work_submit(&producer_work);
 }
+
+void consumer_timer_handler(struct k_timer* dummy){
+	k_work_submit(&consumer_work);
+}
+
 // Define a timer.
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
+K_TIMER_DEFINE(producer_timer, producer_timer_handler, NULL);
+
+K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
+
 
 
 volatile uint8_t count;
@@ -209,21 +337,32 @@ void main(void)
 			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&sht31_thread_data, "SHT_Thread");
 
-
-
 	k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
 			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
 			apds9960, NULL, NULL, NULL, 
 			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&apds9960_thread_data, "APDS Thread");
 
-	k_timer_start(&my_timer, K_SECONDS(2), K_SECONDS(4));
+	k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
+		K_THREAD_STACK_SIZEOF(bmp280_stack_area),
+		bmp280, NULL, NULL, NULL, 
+		PRIORITY, 0, K_MSEC(100));
+	k_thread_name_set(&bmp280_thread_data, "BMP Thread");
 
+	k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
+		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
+		lsm6ds33, NULL, NULL, NULL, 
+		PRIORITY-2, 0, K_MSEC(100));
+	k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
 
 	k_thread_create(&consumer_thread_data, consumer_stack_area,
 			K_THREAD_STACK_SIZEOF(consumer_stack_area),
 			consumer_thread, NULL, NULL, NULL,
 			PRIORITY-3, 0, K_MSEC(100));
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
+
+	k_timer_start(&producer_timer, K_SECONDS(4), K_SECONDS(4));
+	k_timer_start(&consumer_timer, K_SECONDS(4), K_SECONDS(4));
+
 
 }
