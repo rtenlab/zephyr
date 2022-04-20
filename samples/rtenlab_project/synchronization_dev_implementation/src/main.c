@@ -79,7 +79,7 @@ struct k_mutex mymutex;
 
 /* Create a MSG Queue for the threads to use for data passing*/
 // struct k_msgq my_msgq;
-K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 4, 4);
+K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 8, 4);
 
 void apds9960(void *dummy1, void *dummy2, void *dummy3)
 {
@@ -160,34 +160,54 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 	ble_data_t lsm6ds33_local_data;
 	lsm6ds33_local_data.type = SENSOR_LSM6DS33;
 	float accelX, accelY, accelZ;	
+	float totalX, totalY, totalZ;
+	uint8_t count;
 	// Initialize the sensor by setting necessary parameters for gyroscope and accelerometer
 	accel_set_power_mode(ACCEL_LOW_POWER_MODE);
 	gyro_set_power_mode(GYRO_LOW_POWER_MODE);
 	//  Check if the FIFO_FULL Flag is set or not.
 	while(1){
+		// Mutex is locked for very long time. Need to make sure how to do this.
+		printk("LSM: Waiting for Mutex\n");
+		while (1) {
+			k_mutex_lock(&mymutex, K_FOREVER);
+			if (lsm6ds33_fifo_status() & FIFO_FULL) == 0) {
+				k_mutex_unlock(&mymutex);
+				sleep(xx); // for some time or
+				or k_yield(); // relinquish CPU
+			}
+			else break;
+		}
 		k_mutex_lock(&mymutex, K_FOREVER);
+			lsm6ds33_local_data.time_stamp = k_cycle_get_32();
+		printk("[%d] Hello from %s\n", lsm6ds33_local_data.time_stamp,k_thread_name_get(current_thread));
+		printk("Waiting for the FIFO mode to get the data...\n");
 		while((lsm6ds33_fifo_status() & FIFO_FULL) == 0) { };
+		count=0, totalX=0, totalY=0, totalZ=0;
 		while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
 			accelX = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+			totalX+=accelX;
 			lsm6ds33_local_data.lsm6ds33_data.accelX = accelX;
-			printk("AccelX_Raw: %f\n", accelX);
+			// printk("AccelX_Raw: %f\n", accelX);
 			accelY = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+			totalY+=accelY;
 			lsm6ds33_local_data.lsm6ds33_data.accelY = accelY;
-			printk("AccelY_Raw: %f\n", accelY);
+			// printk("AccelY_Raw: %f\n", accelY);
 			accelZ = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
+			totalZ+=accelZ;
 			lsm6ds33_local_data.lsm6ds33_data.accelZ = accelZ;
-			printk("AccelZ_Raw: %f\n", accelZ);
-			lsm6ds33_local_data.time_stamp = k_cycle_get_32();
-			printk("[%d] Hello from %s\n", lsm6ds33_local_data.time_stamp,k_thread_name_get(current_thread));
-			
+			// printk("AccelZ_Raw: %f\n", accelZ);
+			count++;
 			// printk("AccelX_Raw: %f\n", accelX);
 			// printk("AccelY_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
 			// printk("AccelZ_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
 		}
+		printk("Average X: %f\t Y: %f\t Z: %f\n", totalX/count, totalY/count, totalZ/count);
 		k_msgq_put(&my_msgq, &lsm6ds33_local_data, K_FOREVER);
 		lsm6ds33_fifo_change_mode(0);
 		k_sleep(K_FOREVER);
 		k_mutex_unlock(&mymutex);
+		printk("LSM6DS33 Finished!!!\n");
 		lsm6ds33_fifo_change_mode(1);
 	}
 }
@@ -216,6 +236,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 	ARG_UNUSED(dummy3);
 	ble_data_t consumer_local_data;
 	uint32_t time=0;
+	printk("Consumer Thread: Entered for the first time!!!\n");
 	while(1){
 		uint8_t num_used = k_msgq_num_used_get(&my_msgq);
 		for(int i=0; i<num_used; i++){
@@ -306,7 +327,6 @@ K_WORK_DEFINE(producer_work, producer_work_handler);
 K_WORK_DEFINE(consumer_work, consumer_work_handler);
 // Define a function that will be called when a timer expires.
 void producer_timer_handler(struct k_timer* dummy){
-
 	k_work_submit(&producer_work);
 }
 
@@ -352,7 +372,7 @@ void main(void)
 	k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
 		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
 		lsm6ds33, NULL, NULL, NULL, 
-		PRIORITY-2, 0, K_MSEC(100));
+		PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
 
 	k_thread_create(&consumer_thread_data, consumer_stack_area,
@@ -362,7 +382,7 @@ void main(void)
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
 
 	k_timer_start(&producer_timer, K_SECONDS(4), K_SECONDS(4));
-	k_timer_start(&consumer_timer, K_SECONDS(4), K_SECONDS(4));
+	k_timer_start(&consumer_timer, K_SECONDS(6), K_SECONDS(6));
 
 
 }
