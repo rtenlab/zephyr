@@ -164,13 +164,13 @@ uint16_t millisToWaitForConversion(uint8_t bitResolution) {
 void activateExternalPullup(void) {
 	if(useExternalPullup)
 		//digitalWrite(pullupPin, LOW);
-		gpio_pin_set(dev_ds18b20,LED1_PIN,LOW);
+		gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,LOW);
 }
 
 void deactivateExternalPullup(void) {
 	if(useExternalPullup)
 		//digitalWrite(pullupPin, HIGH);
-		gpio_pin_set(dev_ds18b20,LED1_PIN,HIGH);
+		gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,HIGH);
 }
 
 void blockTillConversionComplete(uint8_t bitResolution) {

@@ -8,19 +8,19 @@
 #include <stdio.h>
 #include <drivers/gpio.h>
 
-/* The devicetree node identifier for the "led0" alias. */
-#define LED1_NODE DT_ALIAS(led2)
+/* The devicetree node identifier for the "led2" alias. */
+#define DS_NODE DT_ALIAS(ds0)
 
-#if DT_NODE_HAS_STATUS(LED1_NODE, okay)
-#define LED1	DT_GPIO_LABEL(LED1_NODE, gpios)
-#define LED1_PIN		DT_GPIO_PIN(LED1_NODE, gpios)
-#define LED1_FLAGS	DT_GPIO_FLAGS(LED1_NODE, gpios)
+#if DT_NODE_HAS_STATUS(DS_NODE, okay)
+#define DS_SENSOR	        DT_GPIO_LABEL(DS_NODE, gpios)
+#define DS_SENSOR_PIN		DT_GPIO_PIN(DS_NODE, gpios)
+#define DS_SENSOR_FLAGS	    DT_GPIO_FLAGS(DS_NODE, gpios)
 #else
 /* A build error here means your board isn't set up to blink an LED. */
 #error "Unsupported board: led1 devicetree alias is not defined"
-#define LED1	""
-#define LED1_PIN	0
-#define LED1_FLAGS	0
+#define DS_SENSOR	        ""
+#define DS_SENSOR_PIN	0
+#define DS_SENSOR_FLAGS	    0
 #endif
 #define LOW 0
 #define HIGH 1

@@ -5,10 +5,11 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(peripheral_esp)
 
 target_sources(app PRIVATE
+
   src/main.c
   src/uart_i2c.c
-  src/sht/sht31.c
 
+  src/battery/battery.c
   src/ds/Dallas_temperature.c
   src/ds/Onewire.c
 )

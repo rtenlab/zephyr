@@ -138,7 +138,7 @@ void lsm6ds33_set_fifo_settings(fifo_t* setting){
 	//1->12Hz; 2->26Hz; 3->52Hz and so on. Pg 42 (9.4)
 	setting->sample_rate = 2;
 	// Get 130 words and then raise the water mark flag.
-	setting->threshold = 130;
+	setting->threshold = 100;
 	return;
 }
 

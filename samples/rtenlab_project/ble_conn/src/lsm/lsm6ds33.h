@@ -63,6 +63,8 @@
 #define FIFO_FULL 0x2000
 // Bit mask if the FIFO_EMPTY flag is set.
 #define FIFO_EMPTY 0x1000
+//  Bit mask if the FIFO_FTH flag is set. Only get the data until we hit the watermark
+#define FIFO_WATERMARK 0x8000
 
 // Structure to hold the Gyroscope and Accelerometer data.
 typedef struct lsm6ds33{

@@ -1,5 +1,5 @@
 ds_ble:
-	./make.sh DS18B20_Ble
+	./make.sh All_DS_Sensor_Board
 	./flash.sh
 final:
 	./make.sh final_adafruit_peripheral_bluetooth_multi

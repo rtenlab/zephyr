@@ -11,6 +11,7 @@
 
 #include <zephyr.h>
 #include "battery.h"
+#include "uart_i2c.h"
 
 /** A discharge curve specific to the power source. */
 static const struct battery_level_point levels[] = {
@@ -60,6 +61,7 @@ static const char *now_str(void)
 
 void main(void)
 {
+	enable_uart_console();
 	int rc = battery_measure_enable(true);
 
 	if (rc != 0) {

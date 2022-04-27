@@ -14,6 +14,7 @@
 #include <sys/printk.h>
 #include <sys/byteorder.h>
 #include <zephyr.h>
+#include <math.h>
 
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
@@ -31,6 +32,8 @@
 #include "ds/Onewire.h"
 #include "ds/Dallas_temperature.h"
 #include "bme680/bme680.h"
+#include "blinky/blink.c"
+#include "battery/battery.h"
 
 
 #define SHT31
@@ -39,8 +42,10 @@
 #define LSM6DS33
 #define SCD41
 #define DS18B20
-// #define BME680
+#define BME680
 #define BLE
+#define BATTERY
+
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
 #define CPF_FORMAT_UINT16 	0x06
@@ -130,7 +135,12 @@ static struct bt_uuid_128 bme680_primary_uuid = BT_UUID_INIT_128(
 //@brief  UUID for bme680 apds sensor data: 67b2890f-e716-45e8-a8fe-4213db675224
 static struct bt_uuid_128 bme680_gas_uuid = BT_UUID_INIT_128(
 BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
+#endif
 
+#ifdef BATTERY
+//@brief  UUID for battery level data: c9e3205e-f994-4ff0-8300-9b703aecae08
+static struct bt_uuid_128 battery_primary_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0xc9e3205e, 0xf994, 0x4ff0, 0x8300, 0x9b703aecae08));
 #endif
 
 volatile bool notif_enabled;
@@ -285,43 +295,29 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 			       BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-
-	// Caharactersitic Co2 value. attrs[47]
-	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
-			       BT_GATT_PERM_READ, NULL, NULL, NULL),
-	BT_GATT_CCC(hrmc_ccc_cfg_changed,
-		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-			
-	// Caharactersitic Co2 value. attrs[50]
-	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
-			       BT_GATT_PERM_READ, NULL, NULL, NULL),
-	BT_GATT_CCC(hrmc_ccc_cfg_changed,
-		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	
-	// Caharactersitic Co2 value. attrs[53]
-	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
-			       BT_GATT_PERM_READ, NULL, NULL, NULL),
-	BT_GATT_CCC(hrmc_ccc_cfg_changed,
-		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	
-	// Caharactersitic Co2 value. attrs[56]
-	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
-			       BT_GATT_PERM_READ, NULL, NULL, NULL),
-	BT_GATT_CCC(hrmc_ccc_cfg_changed,
-		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 #endif
 
 #ifdef BME680
 // Primary Service for BME680 sensor.
 	BT_GATT_PRIMARY_SERVICE(&bme680_primary_uuid),
 
-// Characteristic blue_als data value and descriptors for unit and format. attr[60]
+// Characteristic blue_als data value and descriptors for unit and format. attr[48]
 	BT_GATT_CHARACTERISTIC(&bme680_gas_uuid.uuid, BT_GATT_CHRC_NOTIFY,
 					BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 			BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 	BT_GATT_CPF(&bme680_gas),
 
+#endif
+
+#ifdef BATTERY
+	// Primary service for battery level.
+	BT_GATT_PRIMARY_SERVICE(&battery_primary_uuid),
+	// Charateristic battery level value and cccd. attr[53]
+	BT_GATT_CHARACTERISTIC(BT_UUID_VOLTAGE, BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+			BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 #endif
 
 
@@ -389,7 +385,7 @@ void bmp280_notify(void){
 
 #ifdef LSM6DS33
 void lsm6ds33_notify(void){
-	static lsm6ds33_t sensor_value;
+	// static lsm6ds33_t sensor_value;
 	float accelX, accelY, accelZ;
 	int16_t totalX, totalY, totalZ, count=0;
 	int16_t finalX=0, finalY=0, finalZ=0;
@@ -404,18 +400,17 @@ void lsm6ds33_notify(void){
 
 		//  Check if the FIFO_FULL Flag is set or not.
 	while((lsm6ds33_fifo_status() & FIFO_FULL) == 0) { };
-
 	count =0; totalX=0; totalY=0; totalZ=0;
 	while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
 		accelX = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 		totalX +=accelX;
-		printk("AccelX_Raw: %f\n", accelX);
+		// printk("AccelX_Raw: %f\n", accelX);
 		accelY = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 		totalY +=accelY;
-		printk("AccelY_Raw: %f\n", accelY);
+		// printk("AccelY_Raw: %f\n", accelY);
 		accelZ = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 		totalZ +=accelZ;
-		printk("AccelZ_Raw: %f\n", accelZ);
+		// printk("AccelZ_Raw: %f\n", accelZ);
 		count++;
 		// printk("AccelX_Raw: %f\n", accelX);
 		// printk("AccelY_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
@@ -423,8 +418,6 @@ void lsm6ds33_notify(void){
 		delay(50);
 	}
 	lsm6ds33_fifo_change_mode(0);
-
-
 
 	finalX = (int16_t)((totalX/count)*100+32768);
 	finalY = (int16_t)((totalY/count)*100+32768);
@@ -469,28 +462,19 @@ void scd41_notify(void){
 #ifdef DS18B20
 
 void ds18b_notify(void){
-	volatile uint8_t n_devices = getDeviceCount();
+	// Initialize sensor values.
 	static float sensor_value;
+	static uint16_t final_value;
+	// Notify Sensor to start collecting temperature data.
 	requestTemperatures();
-	static uint16_t some[5];	
-
-	for(int i=0; i<n_devices; i++){
-		sensor_value = getTempCByIndex(i);
-		some[i] = (uint16_t)((sensor_value)*100);
-		delay(10);
-	}
-	bt_gatt_notify(NULL, &ess_svc.attrs[44], &some[0], sizeof(some[0]));
+	// We just have one sensor so get the value of the first sensor.
+	sensor_value = getTempCByIndex(0);
+	// Can't send a float value so convert the actual temperature to whole number with 2 point precision.
+	final_value= (uint16_t)((sensor_value)*100);
+	// Notify the respective Handler about the change in values.
+	bt_gatt_notify(NULL, &ess_svc.attrs[44], &final_value, sizeof(final_value));
 	k_sleep(K_MSEC(500));
-	bt_gatt_notify(NULL, &ess_svc.attrs[47], &some[1], sizeof(some[0]));
-	k_sleep(K_MSEC(500));
-	bt_gatt_notify(NULL, &ess_svc.attrs[50], &some[2], sizeof(some[0]));
-	k_sleep(K_MSEC(500));
-	bt_gatt_notify(NULL, &ess_svc.attrs[53], &some[3], sizeof(some[0]));
-	k_sleep(K_MSEC(500));
-	bt_gatt_notify(NULL, &ess_svc.attrs[56], &some[4], sizeof(some[0]));
-	printk("DS Notified!!!\n");
 	return;
-
 }
 #endif
 
@@ -531,9 +515,24 @@ void bme680_notify(bool send){
 	static uint32_t value =0;
 	value = (bme680_calc_gas_resistance(&gasdata, &gascalib));
 	if(send)
-		bt_gatt_notify(NULL, &ess_svc.attrs[60], &value, sizeof(value));
+		bt_gatt_notify(NULL, &ess_svc.attrs[48], &value, sizeof(value));
 	return;
 
+}
+#endif
+
+#ifdef BATTERY
+void batt_notify(){
+	float batt = battery_sample();
+
+	if(batt < 0){
+		led_on_blink0(false);
+		printk("failed to read battery voltage: %d", (int)batt);
+	}
+	
+	uint16_t batt_int = (uint16_t)((batt)*100);
+	bt_gatt_notify(NULL, &ess_svc.attrs[53],&batt_int, sizeof(batt_int));
+	return;
 }
 #endif
 static const struct bt_data ad[] = {
@@ -552,6 +551,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	} else {
 		printk("Connected\n");
 	}
+	// Turn off the LED to notify we are connected!
+	led_on_blink1(false);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -559,19 +560,17 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	BLE_isConnected=false;
 	printk("_isConnected set to: %d\n", BLE_isConnected);
 	// Not sure if this is needed!
-	int8_t err = bt_conn_disconnect(conn, 2);
+	int8_t err = bt_conn_disconnect(conn, 0x08);
 	if(err){
 		printk("Disconnected call returned with %d\n", err);
-		// led_on_blink1(true);
-		// k_busy_wait(5000000);
-		// led_on_blink1(false);
 	}
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if(err){
 		printk("Advertising failed to start (err %d)\n", err);
 	}
 	printk("Disconnected (reason 0x%02x)\n", reason);
-	return;
+	// Turn ON the LED to notify we are not connected!
+	led_on_blink1(true);
 }
 
 static struct bt_conn_cb conn_callbacks = {
@@ -588,25 +587,31 @@ static void bt_ready(void)
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);
-		// LOG_ERR("Advertising failed to start (err %d)\n", err);
 		return;
 	}
-
 	printk("Advertising successfully started\n");
-	// LOG_WRN("Advertising Starteed Successfully\n");
+	// Start the LED immediately to signal it is not connected right now.
+	led_on_blink1(true);
 }
+
 
 
 
 void main(void)
 {
 
-	enable_uart_console();
+	// enable_uart_console();
 	configure_device();
+	
+	// For battery calculation!
+	int rc = battery_measure_enable(true);
+	if (rc != 0) {
+		printk("Failed initialize battery measurement: %d\n", rc);
+		return;
+	}
 
 #ifdef BLE
     int err;
-	
 	err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
@@ -636,12 +641,12 @@ void main(void)
 #ifdef DS18B20
 extern const struct device *dev_ds18b20;
 	int ret;
-	dev_ds18b20 = device_get_binding(LED1);
+	dev_ds18b20 = device_get_binding(DS_SENSOR);
 	if (dev_ds18b20 == NULL) {
 		return;
 	}
 
-	ret = gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
+	ret = gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_OUTPUT);
 	if (ret < 0) {
 		return;
 	}
@@ -651,34 +656,44 @@ extern const struct device *dev_ds18b20;
     while (1) {
 		if(BLE_isConnected){// Wait untill we have BLE_isCONNECTED as true.
 		while(!notif_enabled){;}
-			printk("Sending data currently at the start of the loop!!!\n");
+		k_sleep(K_SECONDS(5));
+		led_on_blink0(true);
+		printk("Sending data currently at the start of the loop!!!\n");
+	
+	#ifdef BATTERY
+		batt_notify();
+	#endif
 	#ifdef SHT31
-			sht_notify();
+		sht_notify();
 	#endif
 
 	#ifdef APDS9960
-			apds9960_notify();
+		apds9960_notify();
 	#endif
 
 	#ifdef BMP280
-			bmp280_notify();
+		bmp280_notify();
 	#endif
 
 	#ifdef LSM6DS33
-			lsm6ds33_notify();
-
+		led_on_blink1(false);
+		led_on_blink1(true);
+		lsm6ds33_notify();
+		led_on_blink1(false);
 	#endif
 
 	#ifdef SCD41
-			scd41_notify();
+		scd41_notify();
 	#endif
 	#ifdef DS18B20
-			ds18b_notify();
+		ds18b_notify();
 	#endif
 	#ifdef BME680
-			bme680_notify(true);
+		bme680_notify(true);
 	#endif
-		k_sleep(K_MINUTES(2));
+		led_on_blink0(false);
+		k_sleep(K_MINUTES(20));
+		// k_sleep(K_SECONDS(10));
 		}//End of if
 	}// End of while
 }// End of main

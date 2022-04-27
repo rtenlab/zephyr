@@ -28,7 +28,7 @@
 #endif
 
 /* The devicetree node identifier for the "led0" alias. */
-#define LED1_NODE DT_ALIAS(led2)
+#define LED1_NODE DT_ALIAS(led1)
 
 #if DT_NODE_HAS_STATUS(LED1_NODE, okay)
 #define LED1	DT_GPIO_LABEL(LED1_NODE, gpios)

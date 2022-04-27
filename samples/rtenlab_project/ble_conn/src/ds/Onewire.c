@@ -15,17 +15,17 @@ static inline void udelay(int secs){
 uint8_t reset(void){
 	// int key = irq_lock();
 	uint8_t r;
-	gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
-	gpio_pin_set(dev_ds18b20,LED1_PIN,LOW);
+	gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_OUTPUT);
+	gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,LOW);
 	udelay(480);
-	gpio_pin_set(dev_ds18b20,LED1_PIN,HIGH);
+	gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,HIGH);
 	udelay(70);
-	// while((gpio_pin_get(dev_ds18b20,LED1_PIN))!=0){
-	// 	r = gpio_pin_get(dev_ds18b20,LED1_PIN);
+	// while((gpio_pin_get(dev_ds18b20,DS_SENSOR_PIN))!=0){
+	// 	r = gpio_pin_get(dev_ds18b20,DS_SENSOR_PIN);
 	// 	printk("stuck in teh while loopwith value of r: %d\n",r);
 	// }
-	gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_INPUT);
-	r = gpio_pin_get(dev_ds18b20,LED1_PIN);
+	gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_INPUT);
+	r = gpio_pin_get(dev_ds18b20,DS_SENSOR_PIN);
 	udelay(410);
 	// irq_unlock(key);
 	return !r;
@@ -34,13 +34,13 @@ uint8_t reset(void){
 uint8_t read_bit(void){
 	uint8_t r;
 	int key = irq_lock();
-	gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
-	gpio_pin_set(dev_ds18b20,LED1_PIN,LOW);
+	gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_OUTPUT);
+	gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,LOW);
 	udelay(3);
-	// gpio_pin_set(dev_ds18b20,LED1_PIN,HIGH);
-	gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_INPUT);
+	// gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,HIGH);
+	gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_INPUT);
 	udelay(10);	
-	r = gpio_pin_get(dev_ds18b20,LED1_PIN);
+	r = gpio_pin_get(dev_ds18b20,DS_SENSOR_PIN);
 	irq_unlock(key);
 	udelay(53);
 	return r;
@@ -62,19 +62,19 @@ void write_bit(uint8_t v){
 	// printk("Outputting bit: %d\n",v);
 	if(v&1){
 		int key = irq_lock();
-		gpio_pin_set(dev_ds18b20,LED1_PIN,LOW);
-		gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
+		gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,LOW);
+		gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_OUTPUT);
 		udelay(10);
-		gpio_pin_set(dev_ds18b20,LED1_PIN,HIGH);
+		gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,HIGH);
 		irq_unlock(key);
 		udelay(55);
 	}
 	else{
 		int key = irq_lock();
-		gpio_pin_set(dev_ds18b20,LED1_PIN,LOW);
-		gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
+		gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,LOW);
+		gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_OUTPUT);
 		udelay(65);
-		gpio_pin_set(dev_ds18b20,LED1_PIN,HIGH);
+		gpio_pin_set(dev_ds18b20,DS_SENSOR_PIN,HIGH);
 		irq_unlock(key);
 		udelay(5);
 	}

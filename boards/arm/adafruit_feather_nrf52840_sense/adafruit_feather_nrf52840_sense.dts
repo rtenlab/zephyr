@@ -34,10 +34,10 @@
 			gpios = <&gpio1 10 0>;
 			label = "Blue LED";
 		};
-		led2: led_2 {
-			gpios = <&gpio0 7 0>;
-			label = "Custom LED";
-		};
+		// led2: led_2 {
+		// 	gpios = <&gpio0 7 0>;
+		// 	label = "Custom LED";
+		// };
 
 	};
 
@@ -53,13 +53,29 @@
 		};
 	};
 
+	// Required to get the voltage value out of the battery.
+	vbatt {
+		compatible = "voltage-divider";
+		io-channels = <&adc 5>;
+		output-ohms = <180000>;
+		full-ohms = <(1500000 + 180000)>;
+		power-gpios = <&gpio0 29 0>;
+	};
+	ds_sensors {
+		compatible = "gpio-leds";
+		ds0:ds_0{
+			gpios = <&gpio0 7 0>;
+			label = "DS_TEMP_SENSOR";
+		};
+	};
 	/* These aliases are provided for compatibility with samples */
 	aliases {
 		led0 = &led0;
 		led1 = &led1;
 		sw0 = &button0;
 		sw1 = &button1;
-		led2 = &led2;
+		//led2 = &led2;
+		ds0 = &ds0;
 	};
 };
 
