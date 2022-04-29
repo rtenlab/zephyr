@@ -23,12 +23,12 @@ void main(void)
 	enable_uart_console();
 	configure_device();
 
-	dev_ds18b20 = device_get_binding(LED1);
+	dev_ds18b20 = device_get_binding(DS_SENSOR);
 	if (dev_ds18b20 == NULL) {
 		return;
 	}
 
-	ret = gpio_pin_configure(dev_ds18b20, LED1_PIN, GPIO_OUTPUT);
+	ret = gpio_pin_configure(dev_ds18b20, DS_SENSOR_PIN, GPIO_OUTPUT);
 	if (ret < 0) {
 		return;
 	}

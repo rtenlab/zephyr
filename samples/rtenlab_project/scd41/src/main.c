@@ -53,7 +53,7 @@ void main(void){
 	printf("Timing to get the measure single shot: %lld ns\n", total_ns);
 	soc_timing_stop();
 	print_data_scd(&sensor_data);
-	delay(100);
+	// delay(100);
 	}
 
 	return;

@@ -27,6 +27,7 @@
 #include "ds/Dallas_temperature.h"
 #include "sht/sht31.h"
 #include "battery/battery.h"
+#include "blinky/blink.c"
 
 #define DS18B20
 #define NUM_SENSORS 8
@@ -121,7 +122,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 
 #ifdef DS18B20
 void ds18b_notify(void){
-	volatile uint8_t n_devices = getDeviceCount();
+	volatile uint8_t n_devices = 8;//getDeviceCount();
 	static float sensor_value;
 	requestTemperatures();
 	static uint16_t some[NUM_SENSORS];
@@ -180,6 +181,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		printk("Connected\n");
 	}
 	BLE_CONNECTED=true;
+	led_on_blink1(false);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -190,6 +192,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 	printk("Disconnected (reason 0x%02x)\n", reason);
+	led_on_blink1(true);
 }
 
 static struct bt_conn_cb conn_callbacks = {
@@ -210,6 +213,7 @@ static void bt_ready(void)
 	}
 
 	printk("Advertising successfully started\n");
+	led_on_blink1(true);
 }
 
 
@@ -249,6 +253,7 @@ extern const struct device *dev_ds18b20;
     while (1) {
 		// printk("Sending data\n");
 		if(notif_enabled){
+			led_on_blink0(true);			
 			k_sleep(K_SECONDS(5));
 		#ifdef BATTERY
 			batt_notify();
@@ -256,6 +261,7 @@ extern const struct device *dev_ds18b20;
 		#ifdef DS18B20
 			ds18b_notify();
 		#endif
+			led_on_blink0(false);
 			k_sleep(K_MINUTES(20));
 		}
     }
