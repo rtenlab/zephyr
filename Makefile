@@ -1,3 +1,6 @@
+battery:
+	./make.sh battery
+	./flash.sh
 ds_ble:
 	./make.sh All_DS_Sensor_Board
 	./flash.sh

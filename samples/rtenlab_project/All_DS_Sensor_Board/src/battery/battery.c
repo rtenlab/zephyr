@@ -182,8 +182,7 @@ int battery_measure_enable(bool enable)
 
 float battery_sample(void)
 {
-	int rc = -ENOENT;
-	float float_rc=0;
+	float rc = -ENOENT;
 	if (battery_ok) {
 		struct divider_data *ddp = &divider_data;
 		const struct divider_config *dcp = &divider_config;
@@ -202,21 +201,17 @@ float battery_sample(void)
 			if (dcp->output_ohm != 0) {
 				rc = val * (uint64_t)dcp->full_ohm
 					/ dcp->output_ohm;
-				LOG_INF("raw %u ~ %u mV => %d mV\n",
-					ddp->raw, val, rc);
 			} else {
 				rc = val;
-				LOG_INF("raw %u ~ %u mV\n", ddp->raw, val);
 			}
 			rc = ddp->raw;
 			rc *= 2;
 			rc *= 3.6;
-			float_rc = rc/1024;
-			//rc /= 1024;
+			rc = rc/1024;
 		}
 	}
 
-	return float_rc;
+	return rc;
 }
 
 unsigned int battery_level_pptt(unsigned int batt_mV,

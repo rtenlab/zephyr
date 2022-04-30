@@ -82,6 +82,7 @@ struct divider_data {
 	struct adc_channel_cfg adc_cfg;
 	struct adc_sequence adc_seq;
 	int16_t raw;
+	// float raw;
 };
 static struct divider_data divider_data = {
 	.adc = DEVICE_DT_GET(DT_IO_CHANNELS_CTLR(VBATT)),
@@ -158,6 +159,7 @@ static int battery_setup(const struct device *arg)
 	int rc = divider_setup();
 
 	battery_ok = (rc == 0);
+	LOG_INF("Battery setup: %d %d", rc, battery_ok);
 	return rc;
 }
 
@@ -182,6 +184,7 @@ int battery_measure_enable(bool enable)
 float battery_sample(void)
 {
 	float rc = -ENOENT;
+	// float float_rc=0;
 	if (battery_ok) {
 		struct divider_data *ddp = &divider_data;
 		const struct divider_config *dcp = &divider_config;
@@ -200,14 +203,18 @@ float battery_sample(void)
 			if (dcp->output_ohm != 0) {
 				rc = val * (uint64_t)dcp->full_ohm
 					/ dcp->output_ohm;
-
+				LOG_INF("raw %u ~ %u mV => %d mV\n",
+					ddp->raw, val, rc);
 			} else {
 				rc = val;
+				LOG_INF("raw %u ~ %u mV\n", ddp->raw, val);
 			}
 			rc = ddp->raw;
+			printk("ddp_raw: %d\n", ddp->raw);
 			rc *= 2;
 			rc *= 3.6;
 			rc = rc/1024;
+			//rc /= 1024;
 		}
 	}
 

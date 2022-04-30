@@ -43,6 +43,10 @@ static struct bt_uuid_128 ds18b_primary_uuid = BT_UUID_INIT_128(
 //@brief  UUID for battery data: b9ad8153-8145-4575-9d1a-ab745b5b2d08
 static struct bt_uuid_128 battery_primary_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0xb9ad8153, 0x8145, 0x4575, 0x9d1a, 0xab745b5b2d08));
+
+// @brief Secondary UUID for battery data:0482d82-3a6f-4f52-b35f-c86eda8747fd
+static struct bt_uuid_128 battery_secondary_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0xe0482d82,0x3a6f,0x4f52,0xb35f,0xc86eda8747fd));
 #endif
 
 volatile bool notif_enabled;
@@ -56,6 +60,13 @@ static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value
 	// LOG_INF("HRS notifications %s", notif_enabled ? "enabled" : "disabled");
 }
 
+#define CPF_FORMAT_UINT16 	0x06
+#define CPF_UNIT_NO_UNIT 	0x2700
+#define CPF_VOLTAGE_UNIT	0x2B18
+static const struct bt_gatt_cpf battery = {
+	.format = CPF_FORMAT_UINT16,
+	.unit = CPF_VOLTAGE_UNIT,
+};
 
 BT_GATT_SERVICE_DEFINE(ess_svc,
 
@@ -113,10 +124,11 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 #ifdef BATTERY
 	BT_GATT_PRIMARY_SERVICE(&battery_primary_uuid),
 	// Characteristic for Battery Voltage data. attrs[26]
-	BT_GATT_CHARACTERISTIC(BT_UUID_VOLTAGE, BT_GATT_CHRC_NOTIFY,
+	BT_GATT_CHARACTERISTIC(&battery_secondary_uuid.uuid, BT_GATT_CHRC_NOTIFY,
 			       BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CPF(&battery),
 #endif
 );
 
@@ -161,6 +173,7 @@ void batt_notify(){
 	
 	batt *= 100;
 	uint16_t batt_int = (uint16_t)(batt);
+	printk("This is what I am sharing currently: %d\n", batt_int);
 	bt_gatt_notify(NULL, &ess_svc.attrs[26],&batt_int, sizeof(batt_int));
 	return;
 }

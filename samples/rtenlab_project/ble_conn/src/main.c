@@ -58,6 +58,7 @@
 #define CPF_UNIT_ACCEL 		0x2713
 #define CPF_UNIT_ANG_VEL	0x2743
 #define CPF_UNIT_ELEC_RES		0x272A
+#define CPF_VOLTAGE_UNIT	0x2B18
 
 volatile bool BLE_isConnected = false;
 
@@ -141,6 +142,10 @@ BT_UUID_128_ENCODE(0x67b2890f, 0xe716, 0x45e8, 0xa8fe, 0x4213db675224));
 //@brief  UUID for battery level data: c9e3205e-f994-4ff0-8300-9b703aecae08
 static struct bt_uuid_128 battery_primary_uuid = BT_UUID_INIT_128(
 BT_UUID_128_ENCODE(0xc9e3205e, 0xf994, 0x4ff0, 0x8300, 0x9b703aecae08));
+
+// @brief UUID for battery secondary level data: 3d84bece-189c-4bc7-9f10-512173ed8eaa
+static struct bt_uuid_128 battery_secondary_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x3d84bece,0x189c,0x4bc7,0x9f10,0x512173ed8eaa));
 #endif
 
 volatile bool notif_enabled;
@@ -189,7 +194,18 @@ static const struct bt_gatt_cpf bme680_gas = {
 	.format = CPF_FORMAT_UINT32,
 	.unit = CPF_UNIT_ELEC_RES,
 };
+#endif
 
+#ifdef BATTERY
+/**
+ * @brief  Struct bt_gatt_cpf to construct the charactristics presentation format.
+ * @note   The sensor uses uint16_t for data and the unit is simple voltage
+ * @retval None
+ */
+static const struct bt_gatt_cpf battery = {
+	.format = CPF_FORMAT_UINT16,
+	.unit = CPF_VOLTAGE_UNIT,
+};
 #endif
 
 
@@ -314,10 +330,11 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	// Primary service for battery level.
 	BT_GATT_PRIMARY_SERVICE(&battery_primary_uuid),
 	// Charateristic battery level value and cccd. attr[53]
-	BT_GATT_CHARACTERISTIC(BT_UUID_VOLTAGE, BT_GATT_CHRC_NOTIFY,
+	BT_GATT_CHARACTERISTIC(&battery_secondary_uuid.uuid, BT_GATT_CHRC_NOTIFY,
 					BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 			BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CPF(&battery),
 #endif
 
 

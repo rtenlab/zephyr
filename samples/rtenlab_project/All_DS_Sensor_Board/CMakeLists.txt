@@ -7,7 +7,7 @@ project(peripheral_esp)
 target_sources(app PRIVATE
 
   src/main.c
-  src/uart_i2c.c
+  # src/uart_i2c.c
 
   src/battery/battery.c
   src/ds/Dallas_temperature.c
