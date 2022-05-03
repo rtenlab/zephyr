@@ -37,16 +37,24 @@ void main(void)
 		volatile int n_devices;
 		sht31_t sht31_data;
 		DallasTemperature_begin();		
-
+		uint8_t address[8];
 		n_devices = getDeviceCount();
 
 		while (1) {
+			
 			read_temp_hum(&sht31_data);
 			print_data_sht(&sht31_data);
 			requestTemperatures();
 			printf("Total devices: %d\n", n_devices);
 			for (int i = 0; i < n_devices; i++) {
-				printf("sensor %d: %f\n", i, getTempCByIndex(i));
+				if(getAddress(address, i)==false){
+					printk("Problem with getAddress thing!\n");
+				}
+				printf("0x");
+				for(int ii=0; ii<8; ii++){
+					printf("%x", address[ii]);
+				}
+				printf("\nsensor %d: %f\n", i, getTempCByIndex(i));
 			}
 			k_msleep(1000);
 		}

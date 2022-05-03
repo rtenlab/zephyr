@@ -170,13 +170,13 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 		// Mutex is locked for very long time. Need to make sure how to do this.
 		printk("LSM: Waiting for Mutex\n");
 		while (1) {
-			k_mutex_lock(&mymutex, K_FOREVER);
-			if (lsm6ds33_fifo_status() & FIFO_FULL) == 0) {
-				k_mutex_unlock(&mymutex);
-				sleep(xx); // for some time or
-				or k_yield(); // relinquish CPU
-			}
-			else break;
+			// k_mutex_lock(&mymutex, K_FOREVER);
+			// if (lsm6ds33_fifo_status() & FIFO_FULL) == 0) {
+			// 	k_mutex_unlock(&mymutex);
+			// 	sleep(xx); // for some time or
+			// 	or k_yield(); // relinquish CPU
+			// }
+			// else break;
 		}
 		k_mutex_lock(&mymutex, K_FOREVER);
 			lsm6ds33_local_data.time_stamp = k_cycle_get_32();
@@ -344,7 +344,7 @@ K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
 volatile uint8_t count;
 void main(void)
 {  
-	enable_uart_console();
+	// enable_uart_console();
 	configure_device();
 	lsm6ds33_init();
 	enable_apds_sensor();
@@ -357,23 +357,23 @@ void main(void)
 			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&sht31_thread_data, "SHT_Thread");
 
-	k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
-			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
-			apds9960, NULL, NULL, NULL, 
-			PRIORITY, 0, K_MSEC(100));
-	k_thread_name_set(&apds9960_thread_data, "APDS Thread");
+	// k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
+	// 		K_THREAD_STACK_SIZEOF(apds9960_stack_area),
+	// 		apds9960, NULL, NULL, NULL, 
+	// 		PRIORITY, 0, K_MSEC(100));
+	// k_thread_name_set(&apds9960_thread_data, "APDS Thread");
 
-	k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
-		K_THREAD_STACK_SIZEOF(bmp280_stack_area),
-		bmp280, NULL, NULL, NULL, 
-		PRIORITY, 0, K_MSEC(100));
-	k_thread_name_set(&bmp280_thread_data, "BMP Thread");
+	// k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
+	// 	K_THREAD_STACK_SIZEOF(bmp280_stack_area),
+	// 	bmp280, NULL, NULL, NULL, 
+	// 	PRIORITY, 0, K_MSEC(100));
+	// k_thread_name_set(&bmp280_thread_data, "BMP Thread");
 
-	k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
-		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
-		lsm6ds33, NULL, NULL, NULL, 
-		PRIORITY, 0, K_MSEC(100));
-	k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
+	// k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
+	// 	K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
+	// 	lsm6ds33, NULL, NULL, NULL, 
+	// 	PRIORITY, 0, K_MSEC(100));
+	// k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
 
 	k_thread_create(&consumer_thread_data, consumer_stack_area,
 			K_THREAD_STACK_SIZEOF(consumer_stack_area),
