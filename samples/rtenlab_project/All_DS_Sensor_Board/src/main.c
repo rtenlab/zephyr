@@ -134,33 +134,44 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 
 #ifdef DS18B20
 void ds18b_notify(void){
+	// This gives the number of DS18B20 devices we have. Hardcoded because something behaves spuriously.
 	volatile uint8_t n_devices = 8;//getDeviceCount();
+	// Helper variable.
 	static float sensor_value;
+	// DS to get the 64-bit address of each device.
+	uint8_t address[8];
+	// Start collecting temperature from all the sensors.
 	requestTemperatures();
-	static uint16_t some[NUM_SENSORS];
+	// DS to hold the data for all the devices and send it over to BLE.
+	static uint32_t some[NUM_SENSORS];
+	// Loop to get the temperature from all the individual sensors.
 	for(int i=0; i<n_devices; i++){
+		// Get the address of each sensor.
+		if(getAddress(address, i)==false){
+			printk("Problem with get Address call\n");
+		}
+		// Get the temperature of each sensor on at a time. Referenced by relative numbering.
 		sensor_value = getTempCByIndex(i);
+		// Change the float value to 2 decimal integer.
 		some[i] = (uint16_t)((sensor_value)*100);
-		printk("Temp[%d]: %d\n", i,some[i]);
+		// Debug message.
+		printk("Before: some[%d]: %d\n", i, some[i]);
+		// Make space to store the 2 bytes of unique sensor address and store the last 2 bytes as the LSB.
+		some[i] = (some[i]<<8) | address[7];
+		// Debug message
+		printk("Address: 0x%x\n", address[7]);
 		delay(10);
 	}
 	printk("Done with DS Reading\n");
 	uint8_t index=1;
+	
 	for(int i=0; i<=NUM_SENSORS; i++){
+
 		index = 1+i*3;
 		printk("Index: %d\n", index);
 		bt_gatt_notify(NULL, &ess_svc.attrs[index], &some[i], sizeof(some[0]));
 		k_sleep(K_MSEC(500));
 	}
-		// bt_gatt_notify(NULL, &ess_svc.attrs[4], &some[1], sizeof(some[0]));
-		// k_sleep(K_MSEC(500));
-		// bt_gatt_notify(NULL, &ess_svc.attrs[7], &some[2], sizeof(some[0]));
-		// k_sleep(K_MSEC(500));
-		// bt_gatt_notify(NULL, &ess_svc.attrs[10], &some[3], sizeof(some[0]));
-		// k_sleep(K_MSEC(500));
-		// bt_gatt_notify(NULL, &ess_svc.attrs[13], &some[4], sizeof(some[0]));
-
-
 }
 #endif
 
@@ -276,6 +287,7 @@ extern const struct device *dev_ds18b20;
 		#endif
 			led_on_blink0(false);
 			k_sleep(K_MINUTES(20));
+			// k_sleep(K_SECONDS(30));
 		}
     }
 }
