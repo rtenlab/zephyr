@@ -8,6 +8,6 @@ if(ret!=0):
 
 message = input("Please enter the commit message: ")
 
-ret = os.system("git commit -m ; message")
+ret = os.system("git commit -m \"" +str(message)+"\"")
 
 ret = os.system("git push origin ; git push personal")

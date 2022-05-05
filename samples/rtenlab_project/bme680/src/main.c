@@ -24,6 +24,7 @@
 #include "uart_i2c.h"
 
 
+
 void main(void){
 	// enabling uart_console for zephyr.
 	enable_uart_console();
@@ -49,21 +50,35 @@ void main(void){
 	printk("%d\n",gascalib.range_sw_err);
 #endif
 
+	// Set the heater for a specific time and temperature.
+	if(bme680_set_heater_conf(350,750,&gascalib)!=true){
+		printk("Set Heater Conf returned with False\n");
+	}
 	while(1){
-		bme680_set_heater_conf(350,150,&gascalib);
-		bme680_set_power_mode(1);
+		// Just to check the Status of measurement before we enable measurement.
+		bme680_check_new_data();
+		// This is how we notify the sensor to take measurement.
+		bme680_set_power_mode(BME680_FORCED_MODE);
+		// Wait for the coil to heat-up
+		delay(750);		
+		// Get the Raw data.
+		bme680_get_raw_gas_data(&gasdata);
+		// Debug purpose
 		#ifdef DEBUG
 		printk("Before: ");
 		bme680_check_new_data();
 		#endif
-		delay(200);
 		#ifdef DEBUG
 		printk("After: ");
 		bme680_check_new_data();
 		#endif
-		bme680_get_raw_gas_data(&gasdata);
-		printk("Value of the gas sensor output is: %d KOhms\n",bme680_calc_gas_resistance(&gasdata, &gascalib)/1000);
+		// Change it to human readable form and print it.
+		printk("Value of the gas sensor output is: %d KOhms\n",
+									bme680_calc_gas_resistance(&gasdata, &gascalib)/1000);
+		// Sampling rate.
+		k_sleep(K_MINUTES(1));
 	}
 
 	return;
 }
+

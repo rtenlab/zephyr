@@ -56,7 +56,7 @@ void main(void)
 				}
 				printf("\nsensor %d: %f\n", i, getTempCByIndex(i));
 			}
-			k_msleep(1000);
+			k_msleep(4000);
 		}
 	}
 }

@@ -96,7 +96,14 @@ uint8_t bme680_calc_gas_wait(uint16_t dur)
     return durval;
 }
 
-
+/**
+ * @brief  Enables each and every configuration option for the gas sensing sequence.
+ * @note   Referenced from the Bosch Library.
+ * @param  heaterTemp: Desired Tempearture in Degrees for the coil.
+ * @param  heaterTime: Desired Time for which the coil should be heated with the given temp.
+ * @param  calib: internal DS for the gas calibration.
+ * @retval true: if everything goes fine. False otherwise.
+ */
 bool bme680_set_heater_conf(uint16_t heaterTemp, uint16_t heaterTime, bme680_gas_par_t* calib){
     // If the heating temperature and time is invalid return false.
     if((heaterTemp==0) || (heaterTime==0)){
@@ -169,7 +176,7 @@ bool bme680_get_raw_gas_data(bme680_gas_data_t* gasdata){
     gasdata->gas_valid_bit = (buffer[1]&0x20);
     gasdata->heater_stability_bit = (buffer[1]&0x10);    
     #ifdef DEBUG
-    printk("Gas_valid: %d\n Heater_Stability: %d\n", gasdata->gas_valid_bit, gasdata->heater_stability_bit);
+    printk("Gas_valid: %d\n Heater_Stability: %d\n", gasdata->gas_valid_bit>>5, gasdata->heater_stability_bit>>4);
     #endif
     return true;
 }
@@ -186,7 +193,19 @@ bool bme680_check_new_data(void){
     return true;
 }
 
-
+uint8_t bme680_check_heater_stability_status(void){
+    uint8_t ret, status=0;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Gas_r_lsb, &status);
+    #ifdef DEBUG
+    if(((status&HEATER_STABILITY_STATUS))==0x10){
+        printk("Heater is Stable!!!\n");
+    }
+    else{
+        printk("heater not stable\n");
+    }
+    #endif
+    return status;
+}
 #ifdef FPU_EN
 
 float bme680_calc_gas_resistance(bme680_gas_data_t*gasdata,bme680_gas_par_t* calib)
