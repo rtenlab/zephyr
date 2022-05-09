@@ -45,6 +45,7 @@
 #define BME680
 #define BLE
 #define BATTERY
+// #define MAIN_DEBUG
 
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
@@ -61,6 +62,7 @@
 #define CPF_VOLTAGE_UNIT	0x2B18
 
 volatile bool BLE_isConnected = false;
+volatile bool bme680_is_first_reading=true;
 
 #ifdef SHT31
 
@@ -351,7 +353,9 @@ void sht_notify(void)
 {
 	static sht31_t sensor_value;
     int16_t temp_value, hum_value;
+	// Get the temperature and humidity value from the sensor.
 	read_temp_hum(&sensor_value);
+	// Convert the float values to 2 pt. precision uint16_t.
     temp_value = (uint16_t)((sensor_value.temp)*100);
 	hum_value = (uint16_t)((sensor_value.humidity)*100);
     bt_gatt_notify(NULL, &ess_svc.attrs[1], &temp_value, sizeof(temp_value));
@@ -387,7 +391,9 @@ void bmp280_notify(void){
 	static bmp280_t sensor_value;
 	uint16_t temperature;
 	uint32_t pressure;
+	// Get the temperature and pressure value from the sensor.
 	bmp_read_press_temp_data(&sensor_value);
+	// Convert the float values to 2 pt. precision uint16_t.
 	temperature = (uint16_t)((sensor_value.temperature)*100);
 	pressure= (uint32_t)((sensor_value.pressure)*10);
 	k_sleep(K_MSEC(500));
@@ -436,6 +442,7 @@ void lsm6ds33_notify(void){
 	}
 	lsm6ds33_fifo_change_mode(0);
 
+	// 327968 is added to convert the negative value to positive. Opposite of this is done on raspberry side.
 	finalX = (int16_t)((totalX/count)*100+32768);
 	finalY = (int16_t)((totalY/count)*100+32768);
 	finalZ = (int16_t)((totalZ/count)*100+32768);
@@ -457,9 +464,8 @@ void lsm6ds33_notify(void){
 
 void scd41_notify(void){
 	static scd41_t sensor_value;
-	printk("Called Measure single shot function call\n");
+	// Get the values from the sensor.
 	measure_single_shot(&sensor_value);
-	printk("Done with the Measure Single shot call\n");
 	uint16_t Co2 = sensor_value.Co2;
 	uint16_t temp, hum;
 	temp = (uint16_t)(sensor_value.temp*100);
@@ -496,43 +502,51 @@ void ds18b_notify(void){
 #endif
 
 #ifdef BME680
-
-void bme680_notify(bool send){
-	bme680_gas_par_t gascalib;
-	bme680_gas_data_t gasdata;
-	if(!bme680_get_gas_calib_data(&gascalib)){
-		printk("BME680: Gas Calib data returned with false at line %d\n", __LINE__);
+void bme680_notify(){
+	// we only need to do this first time. NO need to do that again.
+	static bme680_gas_par_t gascalib;
+	static bme680_gas_data_t gasdata;
+	if(bme680_is_first_reading==true){	
+		// Get the Gas Calibration data
+		if(!bme680_get_gas_calib_data(&gascalib)){
+			printk("BME680: Gas Calib data returned with false at line %d\n", __LINE__);
+		}
+		// Set the heater Configuration
+		if(bme680_set_heater_conf(350,750,&gascalib)!=true){
+			printk("Set Heater Conf returned with False\n");
+		}
+		bme680_is_first_reading=false;
+		#ifdef DEBUG
+		printk("%d\n",gascalib.para1);
+		printk("%d\n",gascalib.para2);
+		printk("%d\n",gascalib.para3);
+		printk("%d\n",gascalib.res_heat_range);
+		printk("%d\n",gascalib.res_heat_val);
+		printk("%d\n",gascalib.range_sw_err);
+		#endif
 	}
-#ifdef DEBUG
-	printk("%d\n",gascalib.para1);
-	printk("%d\n",gascalib.para2);
-	printk("%d\n",gascalib.para3);
-	printk("%d\n",gascalib.res_heat_range);
-	printk("%d\n",gascalib.res_heat_val);
-	printk("%d\n",gascalib.range_sw_err);
-#endif
-	// Set the coil to start heating.
-	bme680_set_heater_conf(350,150,&gascalib);
+	// This marks the start of our data reading stage.
 	// Change the power mode to forced mode.
-	bme680_set_power_mode(1);
+	printk("Starting the BME680 measurement\n");
+	bme680_set_power_mode(BME680_FORCED_MODE);
+	delay(900);
 	#ifdef DEBUG
 	printk("Before: ");
 	// Check if we are getting a new data or no.
 	bme680_check_new_data();
 	#endif
 	// Wait for the heater to heat.
-	delay(200);
+	bme680_get_raw_gas_data(&gasdata);
 	#ifdef DEBUG
 	printk("After: ");
 	// Check again if we are getting a new data or no.
 	bme680_check_new_data();
 	#endif
 	// Get the raw data from the registers.
-	bme680_get_raw_gas_data(&gasdata);
 	static uint32_t value =0;
-	value = (bme680_calc_gas_resistance(&gasdata, &gascalib));
-	if(send)
-		bt_gatt_notify(NULL, &ess_svc.attrs[48], &value, sizeof(value));
+	value = (bme680_calc_gas_resistance(&gasdata, &gascalib)/1000);
+	printk("%d\n", value);
+	bt_gatt_notify(NULL, &ess_svc.attrs[48], &value, sizeof(value));
 	return;
 
 }
@@ -540,21 +554,22 @@ void bme680_notify(bool send){
 
 #ifdef BATTERY
 void batt_notify(){
+	// Get the battery voltage in volts
 	float batt = battery_sample();
 
 	if(batt < 0){
 		led_on_blink0(false);
 		printk("failed to read battery voltage: %d", (int)batt);
 	}
-	
+	// Convert the float to 2 pt precision integer value.
 	uint16_t batt_int = (uint16_t)((batt)*100);
 	bt_gatt_notify(NULL, &ess_svc.attrs[53],&batt_int, sizeof(batt_int));
 	return;
 }
 #endif
+
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_GAP_APPEARANCE, 0x00, 0x03),
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL,
 		      BT_UUID_16_ENCODE(BT_UUID_ESS_VAL)),
 };
@@ -617,7 +632,7 @@ static void bt_ready(void)
 void main(void)
 {
 
-	// enable_uart_console();
+	enable_uart_console();
 	configure_device();
 	
 	// For battery calculation!
@@ -706,11 +721,14 @@ extern const struct device *dev_ds18b20;
 		ds18b_notify();
 	#endif
 	#ifdef BME680
-		bme680_notify(true);
+		bme680_notify();
 	#endif
 		led_on_blink0(false);
+		#ifdef MAIN_DEBUG
+		k_sleep(K_SECONDS(10));
+		#else
 		k_sleep(K_MINUTES(20));
-		// k_sleep(K_SECONDS(10));
+		#endif
 		}//End of if
 	}// End of while
 }// End of main

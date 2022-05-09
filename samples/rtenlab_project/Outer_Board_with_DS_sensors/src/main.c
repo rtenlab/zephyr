@@ -30,7 +30,7 @@
 #include "blinky/blink.c"
 
 #define DS18B20
-#define NUM_SENSORS 8
+#define NUM_SENSORS 9
 #define BATTERY
 volatile bool BLE_CONNECTED;
 #ifdef DS18B20
@@ -120,10 +120,16 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
+		// Caharactersitic Co2 value. attrs[25]
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ, NULL, NULL, NULL),
+	BT_GATT_CCC(hrmc_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+
 #endif
 #ifdef BATTERY
 	BT_GATT_PRIMARY_SERVICE(&battery_primary_uuid),
-	// Characteristic for Battery Voltage data. attrs[26]
+	// Characteristic for Battery Voltage data. attrs[29]
 	BT_GATT_CHARACTERISTIC(&battery_secondary_uuid.uuid, BT_GATT_CHRC_NOTIFY,
 			       BT_GATT_PERM_READ, NULL, NULL, NULL),
 	BT_GATT_CCC(hrmc_ccc_cfg_changed,
@@ -135,7 +141,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 #ifdef DS18B20
 void ds18b_notify(void){
 	// This gives the number of DS18B20 devices we have. Hardcoded because something behaves spuriously.
-	volatile uint8_t n_devices = 8;//getDeviceCount();
+	volatile uint8_t n_devices = NUM_SENSORS;//getDeviceCount();
 	// Helper variable.
 	static float sensor_value;
 	// DS to get the 64-bit address of each device.
@@ -160,7 +166,7 @@ void ds18b_notify(void){
 		some[i] = (some[i]<<8) | address[7];
 		// Debug message
 		printk("Address: 0x%x\n", address[7]);
-		delay(10);
+		delay(250);
 	}
 	printk("Done with DS Reading\n");
 	uint8_t index=1;
@@ -185,14 +191,14 @@ void batt_notify(){
 	batt *= 100;
 	uint16_t batt_int = (uint16_t)(batt);
 	printk("This is what I am sharing currently: %d\n", batt_int);
-	bt_gatt_notify(NULL, &ess_svc.attrs[26],&batt_int, sizeof(batt_int));
+	bt_gatt_notify(NULL, &ess_svc.attrs[29],&batt_int, sizeof(batt_int));
 	return;
 }
 #endif
 
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_GAP_APPEARANCE, 0x00, 0x03),
+	// BT_DATA_BYTES(BT_DATA_GAP_APPEARANCE, 0x56, 0x05, 0x16),
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL,
 		      BT_UUID_16_ENCODE(BT_UUID_ESS_VAL)),
 };
