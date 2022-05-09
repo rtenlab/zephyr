@@ -1,4 +1,5 @@
 #include "bme680.h"
+
 // #define FPU_EN
 /**
  * @brief  Get the ID of the sensor and check if it matches the pre-defined chip ID or not.
@@ -12,9 +13,7 @@ bool bme680_getid(void){
         printk("Error Reading ID of the BME 680 Sensor\n");
         return false;
     }
-    #ifdef BME680_DEBUG
     printk("Chip ID of BME 680 is: 0x%x\n", id);
-    #endif
     // 0x61 is the chip ID for BME680.
     if(id!=0x61)
         return false;
@@ -68,9 +67,7 @@ bool bme680_get_gas_calib_data(bme680_gas_par_t* calib){
         printk("Error while reading the third calibration parameter!!!\n Exiting....\n");
         return false;
     }
-    #ifdef BME680_DEBUG
     printk("Temp for res_range_err: %d\n", temp);
-    #endif
     calib->range_sw_err= ((int8_t)temp & (int8_t)BME680_RSERROR_MSK) / 16;
     calib->amb_temp = 25;
     return true;
@@ -99,24 +96,42 @@ uint8_t bme680_calc_gas_wait(uint16_t dur)
     return durval;
 }
 
-
+/**
+ * @brief  Enables each and every configuration option for the gas sensing sequence.
+ * @note   Referenced from the Bosch Library.
+ * @param  heaterTemp: Desired Tempearture in Degrees for the coil.
+ * @param  heaterTime: Desired Time for which the coil should be heated with the given temp.
+ * @param  calib: internal DS for the gas calibration.
+ * @retval true: if everything goes fine. False otherwise.
+ */
 bool bme680_set_heater_conf(uint16_t heaterTemp, uint16_t heaterTime, bme680_gas_par_t* calib){
     // If the heating temperature and time is invalid return false.
     if((heaterTemp==0) || (heaterTime==0)){
         printk("Invalid Temp. or Time\n");
         return false;
     }
-    // Setting the nbconv and making the run_gas bit to 1 so that it will start measuring the gas values.
-    uint8_t nb_conv_msk = 0x10;
-    uint8_t ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, nb_conv_msk);
+    uint8_t hctrl=0;
+    uint8_t ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_0, &hctrl);
     if(ret!=0){
-        printk("Problem in setting the nb_conv in bme680_set_heater_conf Function!!!\n");
+        printk("Problem in reading CTRL_GAS_0 bme680_set_heater_conf Function!!!\n");
         return false;
     }
+    hctrl &= ~0x08;
+    printf("hctrl=0x%x\n", hctrl);
+    ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_0, hctrl);
+    if(ret!=0){
+        printk("Problem in writing CTRL_GAS_0 bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+
+    
+
+    bme680_set_power_mode(BME680_SLEEP_MODE);
+
     uint8_t res_heat = bme680_calculate_res_heat(heaterTemp, calib);
     uint8_t gas_wait = bme680_calc_gas_wait(heaterTime);
     // Setting the gas wait by changing the actual value using the function "bme_calc_gas_wait".
-    gas_wait &= BME680_Gas_Wait0_msk;
+    // gas_wait &= BME680_Gas_Wait0_msk;
     ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Gas_Wait0, gas_wait);
     if(ret!=0){
         printk("Problem in setting the gas_Wait in bme680_set_heater_conf Function!!!\n");
@@ -126,6 +141,22 @@ bool bme680_set_heater_conf(uint16_t heaterTemp, uint16_t heaterTime, bme680_gas
     ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Res_Heat0, res_heat);
     if(ret!=0){
         printk("Problem in setting the res_heat in bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+
+    // Setting the nbconv and making the run_gas bit to 1 so that it will start measuring the gas values.
+    uint8_t nb_conv_msk=0;
+
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, &nb_conv_msk);
+    if(ret!=0){
+        printk("Problem in reading CTRL_GAS_1 bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+    nb_conv_msk |= 0x10;
+    printf("nb_conv_msk=0x%x\n", nb_conv_msk);
+    ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, nb_conv_msk);
+    if(ret!=0){
+        printk("Problem in setting the nb_conv in bme680_set_heater_conf Function!!!\n");
         return false;
     }
     // If no errors, return true.
@@ -172,7 +203,7 @@ bool bme680_get_raw_gas_data(bme680_gas_data_t* gasdata){
     gasdata->gas_valid_bit = (buffer[1]&0x20);
     gasdata->heater_stability_bit = (buffer[1]&0x10);    
     #ifdef DEBUG
-    printk("Gas_valid: %d\n Heater_Stability: %d\n", gasdata->gas_valid_bit, gasdata->heater_stability_bit);
+    printk("Gas_valid: %d\n Heater_Stability: %d\n", gasdata->gas_valid_bit>>5, gasdata->heater_stability_bit>>4);
     #endif
     return true;
 }
@@ -185,13 +216,23 @@ bool bme680_check_new_data(void){
         printk("Problem while reading the EAS Status register in function 'bme680_check_new_data'\n");
         return false;
     }
-    #ifdef BME680_DEBUG
     printk("EAS_STATUS: %d\n", flag);
-    #endif
     return true;
 }
 
-
+uint8_t bme680_check_heater_stability_status(void){
+    uint8_t ret, status=0;
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Gas_r_lsb, &status);
+    #ifdef DEBUG
+    if(((status&HEATER_STABILITY_STATUS))==0x10){
+        printk("Heater is Stable!!!\n");
+    }
+    else{
+        printk("heater not stable\n");
+    }
+    #endif
+    return status;
+}
 #ifdef FPU_EN
 
 float bme680_calc_gas_resistance(bme680_gas_data_t*gasdata,bme680_gas_par_t* calib)

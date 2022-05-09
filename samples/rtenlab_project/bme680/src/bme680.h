@@ -54,8 +54,9 @@
 #define BME680_RSERROR_MSK 0xF0
 
 #define BME680_FORCED_MODE 0x01
+#define BME680_SLEEP_MODE 0x00
 #define HEATER_STABILITY_STATUS 0x10
-// #define FPU_EN 0
+#define FPU_EN 
 #define DEBUG
 typedef struct {
     uint8_t amb_temp;

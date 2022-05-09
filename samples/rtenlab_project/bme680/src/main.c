@@ -60,23 +60,23 @@ void main(void){
 		// This is how we notify the sensor to take measurement.
 		bme680_set_power_mode(BME680_FORCED_MODE);
 		// Wait for the coil to heat-up
-		delay(750);		
+		delay(900);		
 		// Get the Raw data.
-		bme680_get_raw_gas_data(&gasdata);
 		// Debug purpose
 		#ifdef DEBUG
 		printk("Before: ");
 		bme680_check_new_data();
 		#endif
+		bme680_get_raw_gas_data(&gasdata);
 		#ifdef DEBUG
 		printk("After: ");
 		bme680_check_new_data();
 		#endif
 		// Change it to human readable form and print it.
-		printk("Value of the gas sensor output is: %d KOhms\n",
+		printk("Value of the gas sensor output is: %f KOhms\n",
 									bme680_calc_gas_resistance(&gasdata, &gascalib)/1000);
 		// Sampling rate.
-		k_sleep(K_MINUTES(1));
+		k_sleep(K_SECONDS(30));
 	}
 
 	return;

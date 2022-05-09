@@ -42,6 +42,7 @@
 // LSB nibble 0000 for nb_conv->0 and run_gas->1; to start the gas conversion.
 #define BME680_Gas_Wait0_msk 0x3F
 
+
 #define BME680_par_g1 0xED
 #define BME680_par_g2_LSB 0xEB
 #define BME680_par_g2_MSB 0xEC
@@ -52,9 +53,11 @@
 #define BME680_range_sw_err 0x04
 #define BME680_RSERROR_MSK 0xF0
 
-// #define BME680_DEBUG
-#define FPU_EN
-
+#define BME680_FORCED_MODE 0x01
+#define BME680_SLEEP_MODE 0x00
+#define HEATER_STABILITY_STATUS 0x10
+#define FPU_EN 
+// #define DEBUG
 typedef struct {
     uint8_t amb_temp;
     int8_t para1;
@@ -93,6 +96,7 @@ uint32_t bme680_calc_gas_resistance(bme680_gas_data_t* , bme680_gas_par_t*);
 
 bool bme680_get_raw_gas_data(bme680_gas_data_t*);
 bool bme680_check_new_data(void);
+uint8_t bme680_check_heater_stability_status(void);
 
 
 

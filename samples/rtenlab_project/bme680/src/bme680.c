@@ -110,17 +110,28 @@ bool bme680_set_heater_conf(uint16_t heaterTemp, uint16_t heaterTime, bme680_gas
         printk("Invalid Temp. or Time\n");
         return false;
     }
-    // Setting the nbconv and making the run_gas bit to 1 so that it will start measuring the gas values.
-    uint8_t nb_conv_msk = 0x10;
-    uint8_t ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, nb_conv_msk);
+    uint8_t hctrl=0;
+    uint8_t ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_0, &hctrl);
     if(ret!=0){
-        printk("Problem in setting the nb_conv in bme680_set_heater_conf Function!!!\n");
+        printk("Problem in reading CTRL_GAS_0 bme680_set_heater_conf Function!!!\n");
         return false;
     }
+    hctrl &= ~0x08;
+    printf("hctrl=0x%x\n", hctrl);
+    ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_0, hctrl);
+    if(ret!=0){
+        printk("Problem in writing CTRL_GAS_0 bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+
+    
+
+    bme680_set_power_mode(BME680_SLEEP_MODE);
+
     uint8_t res_heat = bme680_calculate_res_heat(heaterTemp, calib);
     uint8_t gas_wait = bme680_calc_gas_wait(heaterTime);
     // Setting the gas wait by changing the actual value using the function "bme_calc_gas_wait".
-    gas_wait &= BME680_Gas_Wait0_msk;
+    // gas_wait &= BME680_Gas_Wait0_msk;
     ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Gas_Wait0, gas_wait);
     if(ret!=0){
         printk("Problem in setting the gas_Wait in bme680_set_heater_conf Function!!!\n");
@@ -130,6 +141,22 @@ bool bme680_set_heater_conf(uint16_t heaterTemp, uint16_t heaterTime, bme680_gas
     ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Res_Heat0, res_heat);
     if(ret!=0){
         printk("Problem in setting the res_heat in bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+
+    // Setting the nbconv and making the run_gas bit to 1 so that it will start measuring the gas values.
+    uint8_t nb_conv_msk=0;
+
+    ret = i2c_reg_read_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, &nb_conv_msk);
+    if(ret!=0){
+        printk("Problem in reading CTRL_GAS_1 bme680_set_heater_conf Function!!!\n");
+        return false;
+    }
+    nb_conv_msk |= 0x10;
+    printf("nb_conv_msk=0x%x\n", nb_conv_msk);
+    ret = i2c_reg_write_byte(dev_i2c, BME680_Addr, BME680_Ctrl_gas_1, nb_conv_msk);
+    if(ret!=0){
+        printk("Problem in setting the nb_conv in bme680_set_heater_conf Function!!!\n");
         return false;
     }
     // If no errors, return true.
