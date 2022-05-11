@@ -590,6 +590,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	BLE_isConnected=false;
+	notif_enabled=false;
 	printk("_isConnected set to: %d\n", BLE_isConnected);
 	// Not sure if this is needed!
 	int8_t err = bt_conn_disconnect(conn, 0x08);
@@ -632,7 +633,7 @@ static void bt_ready(void)
 void main(void)
 {
 
-	enable_uart_console();
+	// enable_uart_console();
 	configure_device();
 	
 	// For battery calculation!
@@ -727,7 +728,9 @@ extern const struct device *dev_ds18b20;
 		#ifdef MAIN_DEBUG
 		k_sleep(K_SECONDS(10));
 		#else
-		k_sleep(K_MINUTES(20));
+		if (BLE_isConnected) {
+			k_sleep(K_MINUTES(20));
+		}		
 		#endif
 		}//End of if
 	}// End of while
