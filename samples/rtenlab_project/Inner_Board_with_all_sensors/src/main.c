@@ -62,6 +62,7 @@
 #define CPF_VOLTAGE_UNIT	0x2B18
 
 volatile bool BLE_isConnected = false;
+volatile bool notif_enabled;
 volatile bool bme680_is_first_reading=true;
 
 #ifdef SHT31
@@ -150,7 +151,6 @@ static struct bt_uuid_128 battery_secondary_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0x3d84bece,0x189c,0x4bc7,0x9f10,0x512173ed8eaa));
 #endif
 
-volatile bool notif_enabled;
 static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
 	ARG_UNUSED(attr);

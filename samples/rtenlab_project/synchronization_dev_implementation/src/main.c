@@ -17,6 +17,7 @@
 #include "apds9960.c"
 #include "scd41.c"
 #include "bmp280.h"
+#include "ble_setup.c"
 
 
 
@@ -41,15 +42,8 @@
 #define SLEEPTIME 500
 
 
-/*
- * @param my_name      thread identification string
- * @param my_sem       thread's own semaphore
- * @param other_sem    other thread's semaphore
- */
-/* define semaphores */
-
-// K_SEM_DEFINE(threadA_sem, 1, 1);	/* starts off "available" */
-// K_SEM_DEFINE(threadB_sem, 0, 1);	/* starts off "not available" */
+// Enumeration to use inside the new struct ble_data_t. This enum will give names\
+	to different type of sensor data	
 enum data_type{
 	SENSOR_SHT31,
 	SENSOR_APDS9960,
@@ -60,7 +54,6 @@ enum data_type{
 };
 
 typedef struct {
-	// id->0: sht data; id->1: apds data
 	enum data_type type;
 	uint32_t time_stamp;
 	union 
@@ -79,7 +72,7 @@ struct k_mutex mymutex;
 
 /* Create a MSG Queue for the threads to use for data passing*/
 // struct k_msgq my_msgq;
-K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 8, 4);
+K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 10, 4);
 
 void apds9960(void *dummy1, void *dummy2, void *dummy3)
 {
@@ -169,15 +162,15 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 	while(1){
 		// Mutex is locked for very long time. Need to make sure how to do this.
 		printk("LSM: Waiting for Mutex\n");
-		while (1) {
-			// k_mutex_lock(&mymutex, K_FOREVER);
-			// if (lsm6ds33_fifo_status() & FIFO_FULL) == 0) {
-			// 	k_mutex_unlock(&mymutex);
-			// 	sleep(xx); // for some time or
-			// 	or k_yield(); // relinquish CPU
-			// }
-			// else break;
-		}
+		// while (1) {
+		// 	// k_mutex_lock(&mymutex, K_FOREVER);
+		// 	// if (lsm6ds33_fifo_status() & FIFO_FULL) == 0) {
+		// 	// 	k_mutex_unlock(&mymutex);
+		// 	// 	sleep(xx); // for some time or
+		// 	// 	or k_yield(); // relinquish CPU
+		// 	// }
+		// 	// else break;
+		// }
 		k_mutex_lock(&mymutex, K_FOREVER);
 			lsm6ds33_local_data.time_stamp = k_cycle_get_32();
 		printk("[%d] Hello from %s\n", lsm6ds33_local_data.time_stamp,k_thread_name_get(current_thread));
@@ -187,15 +180,12 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 		while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
 			accelX = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 			totalX+=accelX;
-			lsm6ds33_local_data.lsm6ds33_data.accelX = accelX;
 			// printk("AccelX_Raw: %f\n", accelX);
 			accelY = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 			totalY+=accelY;
-			lsm6ds33_local_data.lsm6ds33_data.accelY = accelY;
 			// printk("AccelY_Raw: %f\n", accelY);
 			accelZ = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 			totalZ+=accelZ;
-			lsm6ds33_local_data.lsm6ds33_data.accelZ = accelZ;
 			// printk("AccelZ_Raw: %f\n", accelZ);
 			count++;
 			// printk("AccelX_Raw: %f\n", accelX);
@@ -203,6 +193,9 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 			// printk("AccelZ_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
 		}
 		printk("Average X: %f\t Y: %f\t Z: %f\n", totalX/count, totalY/count, totalZ/count);
+		lsm6ds33_local_data.lsm6ds33_data.accelX = totalX/count;
+		lsm6ds33_local_data.lsm6ds33_data.accelY = totalY/count;
+		lsm6ds33_local_data.lsm6ds33_data.accelZ = totalZ/count;
 		k_msgq_put(&my_msgq, &lsm6ds33_local_data, K_FOREVER);
 		lsm6ds33_fifo_change_mode(0);
 		k_sleep(K_FOREVER);
@@ -229,6 +222,8 @@ char* enum_to_string(ble_data_t* data){
 	return "Not Valid";
 }
 
+
+
 void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -245,7 +240,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				printk("Couldn't find data\n");
 			}
 			time = k_cycle_get_32();
-			if(consumer_local_data.type == SENSOR_APDS9960)
+			if(consumer_local_data.type == SENSOR_APDS9960){
 				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Prox: %d\t Clear: %d\t Red: %d\t Blue: %d\t Green: %d\n",
 													time,
 													consumer_local_data.time_stamp,
@@ -255,24 +250,41 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 														consumer_local_data.apds_cls_data.red,
 														consumer_local_data.apds_cls_data.blue, 
 														consumer_local_data.apds_cls_data.green);
-			
-			else if(consumer_local_data.type == SENSOR_SHT31)
+				// Add code to send it through BLE.
+				bt_gatt_notify(NULL, &ess_svc.attrs[APDS_BLE_HANDLE], &consumer_local_data.apds_cls_data.clear, sizeof(consumer_local_data.apds_cls_data.clear));
+			}
+			else if(consumer_local_data.type == SENSOR_SHT31){
 				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Temp: %f\t Humi: %f\n",
 													time, 
 													consumer_local_data.time_stamp,
 													enum_to_string(&consumer_local_data),
 														consumer_local_data.sht31_data.temp, 
 														consumer_local_data.sht31_data.humidity);
+				int16_t temp_value, hum_value;
+				temp_value = (uint16_t)((consumer_local_data.sht31_data.temp)*100);
+				hum_value = (uint16_t)((consumer_local_data.sht31_data.humidity)*100);
+				bt_gatt_notify(NULL, &ess_svc.attrs[SHT_TEMP_BLE_HANDLE], &temp_value, sizeof(temp_value));
+				delay(100);
+				bt_gatt_notify(NULL, &ess_svc.attrs[SHT_HUM_BLE_HANDLE], &hum_value, sizeof(hum_value));
+			}
 
-			else if(consumer_local_data.type == SENSOR_BMP280)
+			else if(consumer_local_data.type == SENSOR_BMP280){
 				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Temp: %f\t Press: %f\n",
 													time, 
 													consumer_local_data.time_stamp,
 													enum_to_string(&consumer_local_data),
 														consumer_local_data.bmp280_data.temperature, 
 														consumer_local_data.bmp280_data.pressure);
+				static uint16_t temperature;
+				temperature = (uint16_t)((consumer_local_data.bmp280_data.temperature)*100);
+				static uint32_t pressure;
+				pressure = (uint32_t)((consumer_local_data.bmp280_data.pressure)*10);
+				bt_gatt_notify(NULL, &ess_svc.attrs[BMP_TEMP_BLE_HANDLE], &temperature, sizeof(temperature));
+				delay(100);
+				bt_gatt_notify(NULL, &ess_svc.attrs[BMP_PRESS_BLE_HANDLE], &pressure, sizeof(pressure));
+			}
 
-			else if(consumer_local_data.type == SENSOR_LSM6DS33)
+			else if(consumer_local_data.type == SENSOR_LSM6DS33){
 				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t AccelX: %f\t AccelY: %f\t AccelZ: %f\n",
 													time, 
 													consumer_local_data.time_stamp,
@@ -280,6 +292,17 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 														consumer_local_data.lsm6ds33_data.accelX, 
 														consumer_local_data.lsm6ds33_data.accelY,
 														consumer_local_data.lsm6ds33_data.accelZ);
+				static int16_t finalX, finalY, finalZ;
+				finalX = (int16_t)((consumer_local_data.lsm6ds33_data.accelX)*100+32768);
+				finalY = (int16_t)((consumer_local_data.lsm6ds33_data.accelY)*100+32768);
+				finalZ = (int16_t)((consumer_local_data.lsm6ds33_data.accelZ)*100+32768);
+
+				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELX_BLE_HANDLE], &finalX, sizeof(finalX));
+				delay(100);
+				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELY_BLE_HANDLE], &finalY, sizeof(finalY));
+				delay(100);
+				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELZ_BLE_HANDLE], &finalZ, sizeof(finalZ));
+			}
 			
 		}// End of if.
 		k_sleep(K_FOREVER);
@@ -344,12 +367,23 @@ K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
 volatile uint8_t count;
 void main(void)
 {  
-	// enable_uart_console();
+	enable_uart_console();
 	configure_device();
 	lsm6ds33_init();
 	enable_apds_sensor();
 	k_mutex_init(&mymutex);
 	printk("Number of CPUS: %d\n", CONFIG_MP_NUM_CPUS);
+
+	// code to turn on the bluetooth module and start advertisement.
+	int err = bt_enable(NULL);
+	if (err) {
+		printk("Bluetooth init failed (err %d)\n", err);
+		return;
+	}
+
+	bt_ready();
+
+	bt_conn_cb_register(&conn_callbacks);
 
 	k_thread_create(&sht31_thread_data, sht31_stack_area,
 			K_THREAD_STACK_SIZEOF(sht31_stack_area),
@@ -357,23 +391,23 @@ void main(void)
 			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&sht31_thread_data, "SHT_Thread");
 
-	// k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
-	// 		K_THREAD_STACK_SIZEOF(apds9960_stack_area),
-	// 		apds9960, NULL, NULL, NULL, 
-	// 		PRIORITY, 0, K_MSEC(100));
-	// k_thread_name_set(&apds9960_thread_data, "APDS Thread");
+	k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
+			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
+			apds9960, NULL, NULL, NULL, 
+			PRIORITY, 0, K_MSEC(100));
+	k_thread_name_set(&apds9960_thread_data, "APDS Thread");
 
-	// k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
-	// 	K_THREAD_STACK_SIZEOF(bmp280_stack_area),
-	// 	bmp280, NULL, NULL, NULL, 
-	// 	PRIORITY, 0, K_MSEC(100));
-	// k_thread_name_set(&bmp280_thread_data, "BMP Thread");
+	k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
+		K_THREAD_STACK_SIZEOF(bmp280_stack_area),
+		bmp280, NULL, NULL, NULL, 
+		PRIORITY, 0, K_MSEC(100));
+	k_thread_name_set(&bmp280_thread_data, "BMP Thread");
 
-	// k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
-	// 	K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
-	// 	lsm6ds33, NULL, NULL, NULL, 
-	// 	PRIORITY, 0, K_MSEC(100));
-	// k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
+	k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
+		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
+		lsm6ds33, NULL, NULL, NULL, 
+		PRIORITY, 0, K_MSEC(100));
+	k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
 
 	k_thread_create(&consumer_thread_data, consumer_stack_area,
 			K_THREAD_STACK_SIZEOF(consumer_stack_area),
