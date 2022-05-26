@@ -55,7 +55,7 @@ enum data_type{
 
 typedef struct {
 	enum data_type type;
-	uint32_t time_stamp;
+	float period;
 	union 
 	{
 		// scd41_t scd41_data;
@@ -85,12 +85,15 @@ void apds9960(void *dummy1, void *dummy2, void *dummy3)
 	// Write something to start another sensor.
 	ble_data_t apds_local_data;
 	apds_local_data.type = SENSOR_APDS9960;
+	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
 		read_proximity_data(&apds_local_data.apds_cls_data);
 		read_als_data(&apds_local_data.apds_cls_data);
-		apds_local_data.time_stamp = k_cycle_get_32();
-		printk("[%d] Hello from %s\n", apds_local_data.time_stamp,k_thread_name_get(current_thread));
+		curr_timestamp = k_uptime_get_32();
+		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		prev_timestamp = curr_timestamp;
+		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
 		printk("APDS Ended!!!\n");
 		k_mutex_unlock(&mymutex);
@@ -110,11 +113,15 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	current_thread = k_current_get();
 	ble_data_t sht31_local_data;
 	sht31_local_data.type = SENSOR_SHT31;
+	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
 		read_temp_hum(&sht31_local_data.sht31_data);
-		sht31_local_data.time_stamp = k_cycle_get_32();
-		printk("[%d] Hello from %s\n", sht31_local_data.time_stamp,k_thread_name_get(current_thread));
+		// sht31_local_data.period = k_cycle_get_32();
+		curr_timestamp = k_uptime_get_32();
+		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		prev_timestamp=curr_timestamp;
+		printk("[%f] Hello from %s\n", sht31_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &sht31_local_data, K_FOREVER);
 		printk("SHT Ended!!!\n");
 		k_mutex_unlock(&mymutex);
@@ -132,11 +139,15 @@ void bmp280(void* dummy1, void* dummy2, void* dummy3){
 	current_thread = k_current_get();
 	ble_data_t bmp280_local_data;
 	bmp280_local_data.type = SENSOR_BMP280;
+	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
 		bmp_read_press_temp_data(&bmp280_local_data.bmp280_data);
-		bmp280_local_data.time_stamp = k_cycle_get_32();
-		printk("[%d] Hello from %s\n", bmp280_local_data.time_stamp,k_thread_name_get(current_thread));
+		// bmp280_local_data.period = k_cycle_get_32()
+		curr_timestamp=k_uptime_get_32();
+		bmp280_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		prev_timestamp = curr_timestamp;
+		printk("[%f] Hello from %s\n", bmp280_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &bmp280_local_data, K_FOREVER);
 		printk("BMP Ended!!!\n");
 		k_mutex_unlock(&mymutex);
@@ -152,6 +163,7 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 	current_thread = k_current_get();
 	ble_data_t lsm6ds33_local_data;
 	lsm6ds33_local_data.type = SENSOR_LSM6DS33;
+	static uint32_t prev_timestamp, curr_timestamp;
 	float accelX, accelY, accelZ;	
 	float totalX, totalY, totalZ;
 	uint8_t count;
@@ -172,8 +184,10 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 		// 	// else break;
 		// }
 		k_mutex_lock(&mymutex, K_FOREVER);
-			lsm6ds33_local_data.time_stamp = k_cycle_get_32();
-		printk("[%d] Hello from %s\n", lsm6ds33_local_data.time_stamp,k_thread_name_get(current_thread));
+		curr_timestamp = k_uptime_get_32();
+		lsm6ds33_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		prev_timestamp = curr_timestamp;
+		printk("[%f] Hello from %s\n", lsm6ds33_local_data.period,k_thread_name_get(current_thread));
 		printk("Waiting for the FIFO mode to get the data...\n");
 		while((lsm6ds33_fifo_status() & FIFO_FULL) == 0) { };
 		count=0, totalX=0, totalY=0, totalZ=0;
@@ -241,9 +255,9 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 			}
 			time = k_cycle_get_32();
 			if(consumer_local_data.type == SENSOR_APDS9960){
-				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Prox: %d\t Clear: %d\t Red: %d\t Blue: %d\t Green: %d\n",
+				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Prox: %d\t Clear: %d\t Red: %d\t Blue: %d\t Green: %d\n",
 													time,
-													consumer_local_data.time_stamp,
+													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
 													consumer_local_data.apds_cls_data.proximity, 
 														consumer_local_data.apds_cls_data.clear, 
@@ -254,9 +268,9 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				bt_gatt_notify(NULL, &ess_svc.attrs[APDS_BLE_HANDLE], &consumer_local_data.apds_cls_data.clear, sizeof(consumer_local_data.apds_cls_data.clear));
 			}
 			else if(consumer_local_data.type == SENSOR_SHT31){
-				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Temp: %f\t Humi: %f\n",
+				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Temp: %f\t Humi: %f\n",
 													time, 
-													consumer_local_data.time_stamp,
+													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
 														consumer_local_data.sht31_data.temp, 
 														consumer_local_data.sht31_data.humidity);
@@ -269,9 +283,9 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 			}
 
 			else if(consumer_local_data.type == SENSOR_BMP280){
-				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t Temp: %f\t Press: %f\n",
+				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Temp: %f\t Press: %f\n",
 													time, 
-													consumer_local_data.time_stamp,
+													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
 														consumer_local_data.bmp280_data.temperature, 
 														consumer_local_data.bmp280_data.pressure);
@@ -285,9 +299,9 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 			}
 
 			else if(consumer_local_data.type == SENSOR_LSM6DS33){
-				printk("[Current: %d\t Data_time_stamp: %d] Data type: %s\t AccelX: %f\t AccelY: %f\t AccelZ: %f\n",
+				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t AccelX: %f\t AccelY: %f\t AccelZ: %f\n",
 													time, 
-													consumer_local_data.time_stamp,
+													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
 														consumer_local_data.lsm6ds33_data.accelX, 
 														consumer_local_data.lsm6ds33_data.accelY,
