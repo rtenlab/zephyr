@@ -19,6 +19,14 @@
 #include "bmp280.h"
 #include "ble_setup.c"
 
+#define SHT31
+// #define UART
+#define LSM6DS33
+#define APDS9960
+#define SCD41
+#define BMP280
+#define BLE
+
 
 
 /*
@@ -74,6 +82,9 @@ struct k_mutex mymutex;
 // struct k_msgq my_msgq;
 K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 10, 4);
 
+#ifdef APDS9960
+K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
+static struct k_thread apds9960_thread_data;
 void apds9960(void *dummy1, void *dummy2, void *dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -101,8 +112,12 @@ void apds9960(void *dummy1, void *dummy2, void *dummy3)
 	}	
 	return;
 }
+#endif
 
-/* threadA is a static thread that is spawned automatically */
+
+#ifdef SHT31
+K_THREAD_STACK_DEFINE(sht31_stack_area, STACKSIZE);
+static struct k_thread sht31_thread_data;
 void sht31(void *dummy1, void *dummy2, void *dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -129,7 +144,11 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	}
 	return;
 }
+#endif
 
+#ifdef BMP280
+K_THREAD_STACK_DEFINE(bmp280_stack_area, STACKSIZE);
+static struct k_thread bmp280_thread_data;
 void bmp280(void* dummy1, void* dummy2, void* dummy3){
 	ARG_UNUSED(dummy1);
 	ARG_UNUSED(dummy2);
@@ -154,7 +173,11 @@ void bmp280(void* dummy1, void* dummy2, void* dummy3){
 		k_sleep(K_FOREVER);
 	}
 }
+#endif
 
+#ifdef LSM6DS33
+K_THREAD_STACK_DEFINE(lsm6ds33_stack_area, STACKSIZE);
+static struct k_thread lsm6ds33_thread_data;
 void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 	ARG_UNUSED(dummy1);
 	ARG_UNUSED(dummy2);
@@ -194,17 +217,11 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 		while( (lsm6ds33_fifo_status()& FIFO_EMPTY) == 0){
 			accelX = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 			totalX+=accelX;
-			// printk("AccelX_Raw: %f\n", accelX);
 			accelY = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 			totalY+=accelY;
-			// printk("AccelY_Raw: %f\n", accelY);
 			accelZ = lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read());
 			totalZ+=accelZ;
-			// printk("AccelZ_Raw: %f\n", accelZ);
 			count++;
-			// printk("AccelX_Raw: %f\n", accelX);
-			// printk("AccelY_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
-			// printk("AccelZ_Raw: %f\n", lsm6ds33_fifo_get_accel_data(lsm6ds33_fifo_read()));
 		}
 		printk("Average X: %f\t Y: %f\t Z: %f\n", totalX/count, totalY/count, totalZ/count);
 		lsm6ds33_local_data.lsm6ds33_data.accelX = totalX/count;
@@ -218,6 +235,7 @@ void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 		lsm6ds33_fifo_change_mode(1);
 	}
 }
+#endif
 
 char* enum_to_string(ble_data_t* data){
 	if(data->type == SENSOR_APDS9960){
@@ -237,7 +255,9 @@ char* enum_to_string(ble_data_t* data){
 }
 
 
-
+#ifdef CONSUMER
+K_THREAD_STACK_DEFINE(consumer_stack_area, STACKSIZE);
+static struct k_thread consumer_thread_data;
 void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -264,8 +284,10 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 														consumer_local_data.apds_cls_data.red,
 														consumer_local_data.apds_cls_data.blue, 
 														consumer_local_data.apds_cls_data.green);
+#ifdef BLE
 				// Add code to send it through BLE.
 				bt_gatt_notify(NULL, &ess_svc.attrs[APDS_BLE_HANDLE], &consumer_local_data.apds_cls_data.clear, sizeof(consumer_local_data.apds_cls_data.clear));
+#endif
 			}
 			else if(consumer_local_data.type == SENSOR_SHT31){
 				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Temp: %f\t Humi: %f\n",
@@ -277,9 +299,11 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				int16_t temp_value, hum_value;
 				temp_value = (uint16_t)((consumer_local_data.sht31_data.temp)*100);
 				hum_value = (uint16_t)((consumer_local_data.sht31_data.humidity)*100);
+#ifdef BLE				
 				bt_gatt_notify(NULL, &ess_svc.attrs[SHT_TEMP_BLE_HANDLE], &temp_value, sizeof(temp_value));
 				delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[SHT_HUM_BLE_HANDLE], &hum_value, sizeof(hum_value));
+#endif
 			}
 
 			else if(consumer_local_data.type == SENSOR_BMP280){
@@ -293,9 +317,11 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				temperature = (uint16_t)((consumer_local_data.bmp280_data.temperature)*100);
 				static uint32_t pressure;
 				pressure = (uint32_t)((consumer_local_data.bmp280_data.pressure)*10);
+#ifdef BLE
 				bt_gatt_notify(NULL, &ess_svc.attrs[BMP_TEMP_BLE_HANDLE], &temperature, sizeof(temperature));
 				delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[BMP_PRESS_BLE_HANDLE], &pressure, sizeof(pressure));
+#endif 
 			}
 
 			else if(consumer_local_data.type == SENSOR_LSM6DS33){
@@ -310,12 +336,13 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				finalX = (int16_t)((consumer_local_data.lsm6ds33_data.accelX)*100+32768);
 				finalY = (int16_t)((consumer_local_data.lsm6ds33_data.accelY)*100+32768);
 				finalZ = (int16_t)((consumer_local_data.lsm6ds33_data.accelZ)*100+32768);
-
+#ifdef BLE
 				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELX_BLE_HANDLE], &finalX, sizeof(finalX));
 				delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELY_BLE_HANDLE], &finalY, sizeof(finalY));
 				delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELZ_BLE_HANDLE], &finalZ, sizeof(finalZ));
+#endif
 			}
 			
 		}// End of if.
@@ -324,21 +351,8 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 	}
 
 }
+#endif
 
-K_THREAD_STACK_DEFINE(sht31_stack_area, STACKSIZE);
-static struct k_thread sht31_thread_data;
-
-K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
-static struct k_thread apds9960_thread_data;
-
-K_THREAD_STACK_DEFINE(bmp280_stack_area, STACKSIZE);
-static struct k_thread bmp280_thread_data;
-
-K_THREAD_STACK_DEFINE(lsm6ds33_stack_area, STACKSIZE);
-static struct k_thread lsm6ds33_thread_data;
-
-K_THREAD_STACK_DEFINE(consumer_stack_area, STACKSIZE);
-static struct k_thread consumer_thread_data;
 
 /**
  * @brief  Work Handler function. This will be ran by a thread in backend depending on the priority.
@@ -373,64 +387,74 @@ void consumer_timer_handler(struct k_timer* dummy){
 
 // Define a timer.
 K_TIMER_DEFINE(producer_timer, producer_timer_handler, NULL);
-
 K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
 
 
-
-volatile uint8_t count;
 void main(void)
-{  
-	enable_uart_console();
+{
+	// This will configure the I2C device so this is necessary.
 	configure_device();
-	lsm6ds33_init();
-	enable_apds_sensor();
+#ifdef UART  
+	enable_uart_console();
+#endif
 	k_mutex_init(&mymutex);
 	printk("Number of CPUS: %d\n", CONFIG_MP_NUM_CPUS);
 
+#ifdef BLE
 	// code to turn on the bluetooth module and start advertisement.
 	int err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 		return;
 	}
-
 	bt_ready();
-
 	bt_conn_cb_register(&conn_callbacks);
+#endif
 
+#ifdef SHT31
 	k_thread_create(&sht31_thread_data, sht31_stack_area,
 			K_THREAD_STACK_SIZEOF(sht31_stack_area),
 			sht31, NULL, NULL, NULL,
 			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&sht31_thread_data, "SHT_Thread");
-
+#endif
+#ifdef APDS9960
+	enable_apds_sensor();
 	k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
 			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
 			apds9960, NULL, NULL, NULL, 
 			PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&apds9960_thread_data, "APDS Thread");
+#endif
 
+#ifdef BMP280
 	k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
 		K_THREAD_STACK_SIZEOF(bmp280_stack_area),
 		bmp280, NULL, NULL, NULL, 
 		PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&bmp280_thread_data, "BMP Thread");
+#endif
 
+#ifdef LSM6DS33
+	lsm6ds33_init();
 	k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
 		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
 		lsm6ds33, NULL, NULL, NULL, 
 		PRIORITY, 0, K_MSEC(100));
 	k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
+#endif
 
+#ifdef CONSUMER
 	k_thread_create(&consumer_thread_data, consumer_stack_area,
 			K_THREAD_STACK_SIZEOF(consumer_stack_area),
 			consumer_thread, NULL, NULL, NULL,
 			PRIORITY-3, 0, K_MSEC(100));
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
-
+#endif 
 	k_timer_start(&producer_timer, K_SECONDS(4), K_SECONDS(4));
+#ifdef CONSUMER
 	k_timer_start(&consumer_timer, K_SECONDS(6), K_SECONDS(6));
+#endif
 
 
 }
