@@ -46,6 +46,6 @@ void main(void)
 	while (1) {
 		gpio_pin_set(dev, PIN, (int)led_is_on);
 		led_is_on = !led_is_on;
-		k_busy_wait(10000);
+		k_sleep(K_SECONDS(1));
 	}
 }
