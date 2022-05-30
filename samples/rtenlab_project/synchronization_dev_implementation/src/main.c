@@ -20,13 +20,18 @@
 #include "ble_setup.c"
 
 #define SHT31
-// #define UART
+#define UART
 #define LSM6DS33
 #define APDS9960
 #define SCD41
 #define BMP280
 #define BLE
+#define CONSUMER
 
+volatile bool stable_temperature = true;
+
+volatile uint8_t producer_timer_period = 4;
+volatile uint8_t consumer_timer_period = 6;
 
 
 /*
@@ -49,7 +54,7 @@
 /* delay between greetings (in ms) */
 #define SLEEPTIME 500
 
-
+static struct k_thread apds9960_thread_data;
 // Enumeration to use inside the new struct ble_data_t. This enum will give names\
 	to different type of sensor data	
 enum data_type{
@@ -82,37 +87,7 @@ struct k_mutex mymutex;
 // struct k_msgq my_msgq;
 K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 10, 4);
 
-#ifdef APDS9960
-K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
-static struct k_thread apds9960_thread_data;
-void apds9960(void *dummy1, void *dummy2, void *dummy3)
-{
-	ARG_UNUSED(dummy1);
-	ARG_UNUSED(dummy2);
-	ARG_UNUSED(dummy3);
-	struct k_thread *current_thread;
-	// apds9960_t threadC_apds9960;
-	current_thread = k_current_get();
-	// Write something to start another sensor.
-	ble_data_t apds_local_data;
-	apds_local_data.type = SENSOR_APDS9960;
-	static uint32_t prev_timestamp, curr_timestamp;
-	while(1){
-		k_mutex_lock(&mymutex, K_FOREVER);
-		read_proximity_data(&apds_local_data.apds_cls_data);
-		read_als_data(&apds_local_data.apds_cls_data);
-		curr_timestamp = k_uptime_get_32();
-		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
-		prev_timestamp = curr_timestamp;
-		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
-		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
-		printk("APDS Ended!!!\n");
-		k_mutex_unlock(&mymutex);
-		k_sleep(K_FOREVER);
-	}	
-	return;
-}
-#endif
+
 
 
 #ifdef SHT31
@@ -255,7 +230,6 @@ char* enum_to_string(ble_data_t* data){
 }
 
 
-#ifdef CONSUMER
 K_THREAD_STACK_DEFINE(consumer_stack_area, STACKSIZE);
 static struct k_thread consumer_thread_data;
 void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
@@ -351,7 +325,6 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 	}
 
 }
-#endif
 
 
 /**
@@ -389,6 +362,43 @@ void consumer_timer_handler(struct k_timer* dummy){
 K_TIMER_DEFINE(producer_timer, producer_timer_handler, NULL);
 K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
 
+#ifdef APDS9960
+K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
+
+void apds9960(void *dummy1, void *dummy2, void *dummy3)
+{
+	ARG_UNUSED(dummy1);
+	ARG_UNUSED(dummy2);
+	ARG_UNUSED(dummy3);
+	struct k_thread *current_thread;
+	// apds9960_t threadC_apds9960;
+	current_thread = k_current_get();
+	// Write something to start another sensor.
+	ble_data_t apds_local_data;
+	apds_local_data.type = SENSOR_APDS9960;
+	static uint32_t prev_timestamp, curr_timestamp;
+	while(1){
+		k_mutex_lock(&mymutex, K_FOREVER);
+		read_proximity_data(&apds_local_data.apds_cls_data);
+		read_als_data(&apds_local_data.apds_cls_data);
+		if(apds_local_data.apds_cls_data.clear == 0){
+			producer_timer_period = 2;
+			consumer_timer_period=4;
+			k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
+			k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
+		}
+		curr_timestamp = k_uptime_get_32();
+		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		prev_timestamp = curr_timestamp;
+		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
+		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
+		printk("APDS Ended!!!\n");
+		k_mutex_unlock(&mymutex);
+		k_sleep(K_FOREVER);
+	}	
+	return;
+}
+#endif
 
 void main(void)
 {
@@ -451,9 +461,9 @@ void main(void)
 			PRIORITY-3, 0, K_MSEC(100));
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
 #endif 
-	k_timer_start(&producer_timer, K_SECONDS(4), K_SECONDS(4));
+	k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
 #ifdef CONSUMER
-	k_timer_start(&consumer_timer, K_SECONDS(6), K_SECONDS(6));
+	k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
 #endif
 
 
