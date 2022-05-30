@@ -18,12 +18,12 @@
 
 void main(void){
 	sht31_t variable;
-	enable_uart_console();
+	// enable_uart_console();
 	configure_device();
 	while(true){
 		read_temp_hum(&variable);
 		print_data_sht(&variable);
-		delay(10);
+		k_sleep(K_SECONDS(1));
 	}
 	return;
 }

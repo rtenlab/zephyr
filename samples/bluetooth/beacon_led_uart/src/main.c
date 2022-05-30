@@ -102,16 +102,16 @@ void main(void)
 	gpio_pin_configure(dev_led, PIN, GPIO_OUTPUT_ACTIVE | FLAGS);
 
 	/* USB serial setup */
-  dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
-	uint32_t dtr = 0;
+//   dev_usb = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+// 	uint32_t dtr = 0;
 
-	if (usb_enable(NULL)) {
-		return;
-	}
+// 	if (usb_enable(NULL)) {
+// 		return;
+// 	}
 
-	while (!dtr) {
-		uart_line_ctrl_get(dev_usb, UART_LINE_CTRL_DTR, &dtr);
-	}
+// 	while (!dtr) {
+// 		uart_line_ctrl_get(dev_usb, UART_LINE_CTRL_DTR, &dtr);
+// 	}
 
 	/* Initialize the Bluetooth Subsystem */
 	printk("Starting Beacon Demo\n");
