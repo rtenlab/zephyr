@@ -1,9 +1,9 @@
-/* main.c - Hello World demo */
+/* Multi-threading Code for HoneyBee Monitoring System */
 
 /*
- * Copyright (c) 2012-2014 Wind River Systems, Inc.
- *
- * SPDX-License-Identifier: Apache-2.0
+ * Author: Dev Joshi
+ * Email Id: djosh011@ucr.edu
+ * 
  */
 
 // #include "uart_i2c.c"
@@ -11,25 +11,13 @@
 #include <sys/printk.h>
 #include <errno.h>
 
-#include "sht31.c"
-#include "uart_i2c.c"
-#include "lsm6ds33.c"
-#include "apds9960.c"
-#include "scd41.c"
-#include "bmp280.h"
+#include"setup_defines.h"
 #include "ble_setup.c"
 
-#define SHT31
-#define UART
-#define LSM6DS33
-#define APDS9960
-#define SCD41
-#define BMP280
-#define BLE
-#define CONSUMER
 
-volatile bool stable_temperature = true;
 
+volatile uint8_t stable_temperature = 0;
+volatile bool is_period_changed = false;
 volatile uint8_t producer_timer_period = 4;
 volatile uint8_t consumer_timer_period = 6;
 
@@ -45,54 +33,15 @@ volatile uint8_t consumer_timer_period = 6;
 		     && IS_ENABLED(CONFIG_SCHED_CPU_MASK) \
 		     && (CONFIG_MP_NUM_CPUS > 1))
 
-/* size of stack area used by each thread */
-#define STACKSIZE 1024
+
 
 /* scheduling priority used by each thread */
 #define PRIORITY 7
 
-/* delay between greetings (in ms) */
-#define SLEEPTIME 500
-
-static struct k_thread apds9960_thread_data;
-// Enumeration to use inside the new struct ble_data_t. This enum will give names\
-	to different type of sensor data	
-enum data_type{
-	SENSOR_SHT31,
-	SENSOR_APDS9960,
-	SENSOR_BMP280,
-	SENSOR_LSM6DS33,
-	SENSOR_SCD41,
-	SENSOR_DS18B20,
-};
-
-typedef struct {
-	enum data_type type;
-	float period;
-	union 
-	{
-		// scd41_t scd41_data;
-		sht31_t sht31_data;
-		lsm6ds33_t lsm6ds33_data;
-		bmp280_t bmp280_data;
-		apds9960_t apds_cls_data;
-		// int16_t ds18b20_temp_data;
-	};
-}ble_data_t;
-
-
-struct k_mutex mymutex;
-
-/* Create a MSG Queue for the threads to use for data passing*/
-// struct k_msgq my_msgq;
-K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), 10, 4);
-
-
-
+struct k_mutex mymutex, tempvalue;
 
 #ifdef SHT31
-K_THREAD_STACK_DEFINE(sht31_stack_area, STACKSIZE);
-static struct k_thread sht31_thread_data;
+
 void sht31(void *dummy1, void *dummy2, void *dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -106,13 +55,18 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
+		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		read_temp_hum(&sht31_local_data.sht31_data);
 		// sht31_local_data.period = k_cycle_get_32();
 		curr_timestamp = k_uptime_get_32();
-		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		prev_timestamp=curr_timestamp;
 		printk("[%f] Hello from %s\n", sht31_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &sht31_local_data, K_FOREVER);
+		if(sht31_local_data.sht31_data.temp >= SWARMING_TEMP_THRESHOLD){
+			k_mutex_lock(&tempvalue, K_FOREVER);
+			stable_temperature |= (1<<SHT31_POS);
+			k_mutex_unlock(&tempvalue);
+		}
 		printk("SHT Ended!!!\n");
 		k_mutex_unlock(&mymutex);
 		k_sleep(K_FOREVER);
@@ -122,8 +76,7 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 #endif
 
 #ifdef BMP280
-K_THREAD_STACK_DEFINE(bmp280_stack_area, STACKSIZE);
-static struct k_thread bmp280_thread_data;
+
 void bmp280(void* dummy1, void* dummy2, void* dummy3){
 	ARG_UNUSED(dummy1);
 	ARG_UNUSED(dummy2);
@@ -136,13 +89,18 @@ void bmp280(void* dummy1, void* dummy2, void* dummy3){
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
+		bmp280_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		bmp_read_press_temp_data(&bmp280_local_data.bmp280_data);
 		// bmp280_local_data.period = k_cycle_get_32()
 		curr_timestamp=k_uptime_get_32();
-		bmp280_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		prev_timestamp = curr_timestamp;
 		printk("[%f] Hello from %s\n", bmp280_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &bmp280_local_data, K_FOREVER);
+		if(bmp280_local_data.bmp280_data.temperature>=SWARMING_TEMP_THRESHOLD){
+			k_mutex_lock(&tempvalue, K_FOREVER);
+			stable_temperature |= (1<<BMP280_POS);
+			k_mutex_unlock(&tempvalue);
+		}
 		printk("BMP Ended!!!\n");
 		k_mutex_unlock(&mymutex);
 		k_sleep(K_FOREVER);
@@ -150,9 +108,50 @@ void bmp280(void* dummy1, void* dummy2, void* dummy3){
 }
 #endif
 
+
+
+#ifdef APDS9960
+void apds9960(void *dummy1, void *dummy2, void *dummy3)
+{
+	ARG_UNUSED(dummy1);
+	ARG_UNUSED(dummy2);
+	ARG_UNUSED(dummy3);
+	struct k_thread *current_thread;
+	// apds9960_t threadC_apds9960;
+	current_thread = k_current_get();
+	// Write something to start another sensor.
+	ble_data_t apds_local_data;
+	apds_local_data.type = SENSOR_APDS9960;
+	static uint32_t prev_timestamp, curr_timestamp;
+	while(1){
+		k_mutex_lock(&mymutex, K_FOREVER);
+		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		read_proximity_data(&apds_local_data.apds_cls_data);
+		read_als_data(&apds_local_data.apds_cls_data);
+		// This is how it will change the period of the timer. 
+		if(apds_local_data.apds_cls_data.clear == 0){
+			producer_timer_period = 2;
+			consumer_timer_period=4;
+			k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
+			k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
+		}
+		curr_timestamp = k_uptime_get_32();
+		
+		prev_timestamp = curr_timestamp;
+		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
+		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
+		printk("APDS Ended!!!\n");
+		k_mutex_unlock(&mymutex);
+		k_sleep(K_FOREVER);
+	}	
+	return;
+}
+#endif
+
+
+
 #ifdef LSM6DS33
-K_THREAD_STACK_DEFINE(lsm6ds33_stack_area, STACKSIZE);
-static struct k_thread lsm6ds33_thread_data;
+
 void lsm6ds33(void* dummy1, void* dummy2, void* dummy3){
 	ARG_UNUSED(dummy1);
 	ARG_UNUSED(dummy2);
@@ -230,8 +229,7 @@ char* enum_to_string(ble_data_t* data){
 }
 
 
-K_THREAD_STACK_DEFINE(consumer_stack_area, STACKSIZE);
-static struct k_thread consumer_thread_data;
+
 void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 {
 	ARG_UNUSED(dummy1);
@@ -327,78 +325,61 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 }
 
 
-/**
- * @brief  Work Handler function. This will be ran by a thread in backend depending on the priority.
- * @note   
- * @param  struct k_work*: What wok needs to be done.
- * @retval None
- */
-void producer_work_handler(struct k_work *work){
-	printk("Timer fired!!!\n");
-	k_wakeup(&sht31_thread_data);
-	k_wakeup(&apds9960_thread_data);
-	k_wakeup(&bmp280_thread_data);
-	k_wakeup(&lsm6ds33_thread_data);
-}
-
-void consumer_work_handler(struct k_work * work){
-	printk("Consumer timer Fired!!!\n");
-	k_wakeup(&consumer_thread_data);
-}
-// Define a work and it's work handler
-K_WORK_DEFINE(producer_work, producer_work_handler);
-
-K_WORK_DEFINE(consumer_work, consumer_work_handler);
-// Define a function that will be called when a timer expires.
-void producer_timer_handler(struct k_timer* dummy){
-	k_work_submit(&producer_work);
-}
-
-void consumer_timer_handler(struct k_timer* dummy){
-	k_work_submit(&consumer_work);
-}
-
-// Define a timer.
-K_TIMER_DEFINE(producer_timer, producer_timer_handler, NULL);
-K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
-
-#ifdef APDS9960
-K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
-
-void apds9960(void *dummy1, void *dummy2, void *dummy3)
-{
+void temperature_checker_thread(void* dummy1, void* dummy2, void* dummy3){
 	ARG_UNUSED(dummy1);
 	ARG_UNUSED(dummy2);
 	ARG_UNUSED(dummy3);
-	struct k_thread *current_thread;
-	// apds9960_t threadC_apds9960;
-	current_thread = k_current_get();
-	// Write something to start another sensor.
-	ble_data_t apds_local_data;
-	apds_local_data.type = SENSOR_APDS9960;
-	static uint32_t prev_timestamp, curr_timestamp;
+	bool is_period_changed = false;
+	uint8_t mins_since_counter_changed=0;
 	while(1){
-		k_mutex_lock(&mymutex, K_FOREVER);
-		read_proximity_data(&apds_local_data.apds_cls_data);
-		read_als_data(&apds_local_data.apds_cls_data);
-		if(apds_local_data.apds_cls_data.clear == 0){
-			producer_timer_period = 2;
-			consumer_timer_period=4;
-			k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
-			k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
+		// Period is not changed in last 60 minutes. Check if we are before swarming effect.
+		if(is_period_changed == false){
+			// Lock the mutex to read the stable_temperature value. Many threads might be 
+			// changing this at the same time.
+			k_mutex_lock(&tempvalue, K_FOREVER);
+			if((stable_temperature == 7) || (stable_temperature == 11) || 
+				(stable_temperature == 13) || (stable_temperature == 14) ||
+				(stable_temperature == 15)){
+					k_mutex_unlock(&tempvalue);
+					// Change the following values according to the needs. 
+					// This will start a new timer with new producer and consumer period values.
+					producer_timer_period = 2;
+					consumer_timer_period = 4;
+					k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
+				#ifdef CONSUMER
+					k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
+				#endif
+					is_period_changed=true;
+					mins_since_counter_changed=0;
+			}
 		}
-		curr_timestamp = k_uptime_get_32();
-		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
-		prev_timestamp = curr_timestamp;
-		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
-		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
-		printk("APDS Ended!!!\n");
-		k_mutex_unlock(&mymutex);
+		// The period for both the threads was changed and hence we should count the number 
+		// of times the data was taken before we change the is_period_changed to false.
+		else{
+			// Considering that the period was set to every minute, we should get the data
+			// for 60 minutes (hence once we have a trigger, we will take data every minute
+			// for 60 minutes).
+			mins_since_counter_changed++;
+			if(mins_since_counter_changed >=60){
+				is_period_changed=false;
+				// Change the values to what the period values previously where. This variable is not needed.
+				producer_timer_period = 4;
+				consumer_timer_period = 6;
+				// Start the timers again, basically will change the period for both the timers.
+				k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
+			#ifdef CONSUMER
+				k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
+			#endif
+			}
+			
+		}
+		// Wait until one of the threads wake you up.
 		k_sleep(K_FOREVER);
-	}	
-	return;
+	}
+
 }
-#endif
+
+
 
 void main(void)
 {
@@ -408,6 +389,7 @@ void main(void)
 	enable_uart_console();
 #endif
 	k_mutex_init(&mymutex);
+	k_mutex_init(&tempvalue);
 	printk("Number of CPUS: %d\n", CONFIG_MP_NUM_CPUS);
 
 #ifdef BLE
@@ -425,7 +407,7 @@ void main(void)
 	k_thread_create(&sht31_thread_data, sht31_stack_area,
 			K_THREAD_STACK_SIZEOF(sht31_stack_area),
 			sht31, NULL, NULL, NULL,
-			PRIORITY, 0, K_MSEC(100));
+			PRIORITY, 0, K_NO_WAIT);
 	k_thread_name_set(&sht31_thread_data, "SHT_Thread");
 #endif
 #ifdef APDS9960
@@ -433,7 +415,7 @@ void main(void)
 	k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
 			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
 			apds9960, NULL, NULL, NULL, 
-			PRIORITY, 0, K_MSEC(100));
+			PRIORITY, 0, K_MSEC(20));
 	k_thread_name_set(&apds9960_thread_data, "APDS Thread");
 #endif
 
@@ -441,7 +423,7 @@ void main(void)
 	k_thread_create(&bmp280_thread_data, bmp280_stack_area, 
 		K_THREAD_STACK_SIZEOF(bmp280_stack_area),
 		bmp280, NULL, NULL, NULL, 
-		PRIORITY, 0, K_MSEC(100));
+		PRIORITY, 0, K_MSEC(40));
 	k_thread_name_set(&bmp280_thread_data, "BMP Thread");
 #endif
 
@@ -450,7 +432,7 @@ void main(void)
 	k_thread_create(&lsm6ds33_thread_data, lsm6ds33_stack_area, 
 		K_THREAD_STACK_SIZEOF(lsm6ds33_stack_area),
 		lsm6ds33, NULL, NULL, NULL, 
-		PRIORITY, 0, K_MSEC(100));
+		PRIORITY, 0, K_MSEC(60));
 	k_thread_name_set(&lsm6ds33_thread_data, "LSM Thread");
 #endif
 
@@ -458,9 +440,15 @@ void main(void)
 	k_thread_create(&consumer_thread_data, consumer_stack_area,
 			K_THREAD_STACK_SIZEOF(consumer_stack_area),
 			consumer_thread, NULL, NULL, NULL,
-			PRIORITY-3, 0, K_MSEC(100));
+			PRIORITY-3, 0, K_MSEC(80));
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
 #endif 
+
+	k_thread_create(&temperature_checker_thread_data, temperature_checker_stack_area,
+		K_THREAD_STACK_SIZEOF(temperature_checker_stack_area),
+		temperature_checker_thread, NULL, NULL, NULL,
+		PRIORITY, 0, K_MSEC(100));
+		k_thread_name_set(&temperature_checker_thread_data, "Temperature_Checker_Thread");
 	k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
 #ifdef CONSUMER
 	k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));

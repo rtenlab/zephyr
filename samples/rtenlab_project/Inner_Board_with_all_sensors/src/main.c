@@ -45,7 +45,7 @@
 #define BME680
 #define BLE
 #define BATTERY
-// #define MAIN_DEBUG
+#define MAIN_DEBUG
 
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
@@ -726,7 +726,7 @@ extern const struct device *dev_ds18b20;
 	#endif
 		led_on_blink0(false);
 		#ifdef MAIN_DEBUG
-		k_sleep(K_SECONDS(10));
+		k_sleep(K_SECONDS(70));
 		#else
 		if (BLE_isConnected) {
 			k_sleep(K_MINUTES(20));

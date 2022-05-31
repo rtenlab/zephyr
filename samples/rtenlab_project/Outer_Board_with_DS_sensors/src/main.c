@@ -32,6 +32,7 @@
 #define DS18B20
 #define NUM_SENSORS 9
 #define BATTERY
+#define MAIN_DEBUG
 volatile bool BLE_CONNECTED;
 #ifdef DS18B20
 //@brief  UUID for clear_als apds sensor data: e66e54fc-4231-41ae-9663-b43f50cfcb3b
@@ -292,8 +293,11 @@ extern const struct device *dev_ds18b20;
 			ds18b_notify();
 		#endif
 			led_on_blink0(false);
+		#ifdef MAIN_DEBUG
+			k_sleep(K_SECONDS(70));
+		#else
 			k_sleep(K_MINUTES(20));
-			// k_sleep(K_SECONDS(30));
+		#endif
 		}
     }
 }

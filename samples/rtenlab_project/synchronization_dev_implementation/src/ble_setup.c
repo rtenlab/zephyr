@@ -5,10 +5,10 @@
 #include <bluetooth/gatt.h>
 #include <usb/usb_device.h>
 #include "blink.c"
-#define SHT31
-#define APDS9960
-#define BMP280
-#define LSM6DS33
+#define BLE_SHT31
+#define BLE_APDS9960
+#define BLE_BMP280
+#define BLE_LSM6DS33
 
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04
@@ -38,7 +38,7 @@ volatile bool BLE_isConnected = false;
 volatile bool notif_enabled = false;
 
 
-#ifdef SHT31
+#ifdef BLE_SHT31
 
 // @brief 57812a99-9146-4e72-a4b7-5159632dee90
 static struct bt_uuid_128 sht_uuid = BT_UUID_INIT_128(
@@ -46,7 +46,7 @@ static struct bt_uuid_128 sht_uuid = BT_UUID_INIT_128(
 
 #endif
 
-#ifdef APDS9960
+#ifdef BLE_APDS9960
 
 // @brief  UUID for apds sensor data: ebcc60b7-974c-43e1-a973-426e79f9bc6c 
 static struct bt_uuid_128 apds_uuid = BT_UUID_INIT_128(
@@ -59,13 +59,13 @@ static struct bt_uuid_128 apds_als_clear_uuid = BT_UUID_INIT_128(
 
 #endif
 
-#ifdef BMP280
+#ifdef BLE_BMP280
 
 static struct bt_uuid_128 bmp280_primary_uuid = BT_UUID_INIT_128(
 		BT_UUID_128_ENCODE(0xf4356abe, 0xb85f, 0x47c7, 0xab4e, 0x54df8f4ad025));
 #endif
 
-#ifdef LSM6DS33
+#ifdef BLE_LSM6DS33
 
 //@brief  UUID for clear_als apds sensor data: e82bd800-c62c-43d5-b03f-c7381b38892a
 static struct bt_uuid_128 lsm6ds33_primary_uuid = BT_UUID_INIT_128(
@@ -95,7 +95,7 @@ static void hrmc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value
 
 
 
-#ifdef APDS9960
+#ifdef BLE_APDS9960
 
 /**
  * @brief  Struct bt_gatt_cpf to construct the charactersitics presentation format.
@@ -108,7 +108,7 @@ static const struct bt_gatt_cpf als = {
 
 #endif
 
-#ifdef LSM6DS33
+#ifdef BLE_LSM6DS33
 /**
  * @brief  Struct bt_gatt_cpf to construct the charactersitics presentation format.
  * @note   Accelerometer data is 16 bits long and the unit is m/s^2.
@@ -124,7 +124,7 @@ static const struct bt_gatt_cpf accel = {
 
 BT_GATT_SERVICE_DEFINE(ess_svc,
 // Primary Service for SHT Sensor. Basically Tempearture and sensor value.
-#ifdef SHT31
+#ifdef BLE_SHT31
 	BT_GATT_PRIMARY_SERVICE(&sht_uuid),
 // Caharactersitic temp. value. attrs[1]
 	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
@@ -140,7 +140,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 #endif
 
-#ifdef APDS9960
+#ifdef BLE_APDS9960
 // Primary Service for APDS9960 sensor.
 	BT_GATT_PRIMARY_SERVICE(&apds_uuid),
 
@@ -152,7 +152,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 	BT_GATT_CPF(&als),
 #endif
 
-#ifdef BMP280
+#ifdef BLE_BMP280
 	BT_GATT_PRIMARY_SERVICE(&bmp280_primary_uuid),
 // Caharactersitic temp. value. attrs[13]
 	BT_GATT_CHARACTERISTIC(BT_UUID_TEMPERATURE, BT_GATT_CHRC_NOTIFY,
@@ -167,7 +167,7 @@ BT_GATT_SERVICE_DEFINE(ess_svc,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 #endif
 
-#ifdef LSM6DS33
+#ifdef BLE_LSM6DS33
 	BT_GATT_PRIMARY_SERVICE(&lsm6ds33_primary_uuid),
 // Characteristic green_als data value and descriptors for unit and format. attr[20]
 	BT_GATT_CHARACTERISTIC(&lsm6ds33_accl_x_uuid.uuid, BT_GATT_CHRC_NOTIFY,
