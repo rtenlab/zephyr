@@ -8,6 +8,7 @@
 #include <device.h>
 #include <devicetree.h>
 #include <drivers/gpio.h>
+#include <pm/state.h>
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   1000
@@ -42,10 +43,10 @@ void main(void)
 	if (ret < 0) {
 		return;
 	}
-
+	
 	while (1) {
 		gpio_pin_set(dev, PIN, (int)led_is_on);
 		led_is_on = !led_is_on;
-		k_sleep(K_SECONDS(1));
+		k_busy_wait(2000000);
 	}
 }

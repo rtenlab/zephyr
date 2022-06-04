@@ -8,12 +8,12 @@
 #include "bmp280.h"
 
 // THREAD DEFINES
-#define SHT31
+// #define SHT31
 // #define UART
 // #define LSM6DS33
 #define APDS9960
-#define SCD41
-#define BMP280
+// #define SCD41
+// #define BMP280
 #define BLE
 #define CONSUMER
 /* size of stack area used by each thread */
@@ -59,7 +59,7 @@ static struct k_thread temperature_checker_thread_data;
 
 
 // Let's first define message queue.
-#define MSGQ_LENGTH 8
+#define MSGQ_LENGTH 10
 #define MSGQ_BYTE_BOUNDARY 4
 
 // Enumeration to use inside the new struct ble_data_t. This enum will give names\
@@ -121,13 +121,17 @@ void producer_work_handler(struct k_work *work){
 #endif
 }
 
+#ifdef CONSUMER
 void consumer_work_handler(struct k_work * work){
 	printk("Consumer timer Fired!!!\n");
 	k_wakeup(&consumer_thread_data);
 }
+#endif
 // Define a work and it's work handler
 K_WORK_DEFINE(producer_work, producer_work_handler);
+#ifdef CONSUMER
 K_WORK_DEFINE(consumer_work, consumer_work_handler);
+#endif
 
 /** WORKQ DEFINES END**/
 
@@ -137,13 +141,18 @@ void producer_timer_handler(struct k_timer* dummy){
 	k_work_submit(&producer_work);
 }
 
+#ifdef CONSUMER
 void consumer_timer_handler(struct k_timer* dummy){
 	k_work_submit(&consumer_work);
 }
+#endif
 
 // Define a timer.
 K_TIMER_DEFINE(producer_timer, producer_timer_handler, NULL);
+
+#ifdef CONSUMER
 K_TIMER_DEFINE(consumer_timer, consumer_timer_handler, NULL);
+#endif
 
 /*** TIMER DEFINES END ***/
 

@@ -55,11 +55,10 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
-		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
-		read_temp_hum(&sht31_local_data.sht31_data);
-		// sht31_local_data.period = k_cycle_get_32();
 		curr_timestamp = k_uptime_get_32();
+		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		prev_timestamp=curr_timestamp;
+		read_temp_hum(&sht31_local_data.sht31_data);
 		printk("[%f] Hello from %s\n", sht31_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &sht31_local_data, K_FOREVER);
 		if(sht31_local_data.sht31_data.temp >= SWARMING_TEMP_THRESHOLD){
@@ -89,11 +88,10 @@ void bmp280(void* dummy1, void* dummy2, void* dummy3){
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
-		bmp280_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
-		bmp_read_press_temp_data(&bmp280_local_data.bmp280_data);
-		// bmp280_local_data.period = k_cycle_get_32()
 		curr_timestamp=k_uptime_get_32();
+		bmp280_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		prev_timestamp = curr_timestamp;
+		bmp_read_press_temp_data(&bmp280_local_data.bmp280_data);
 		printk("[%f] Hello from %s\n", bmp280_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &bmp280_local_data, K_FOREVER);
 		if(bmp280_local_data.bmp280_data.temperature>=SWARMING_TEMP_THRESHOLD){
@@ -125,19 +123,11 @@ void apds9960(void *dummy1, void *dummy2, void *dummy3)
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
+		curr_timestamp = k_uptime_get_32();
 		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
+		prev_timestamp = curr_timestamp;
 		read_proximity_data(&apds_local_data.apds_cls_data);
 		read_als_data(&apds_local_data.apds_cls_data);
-		// This is how it will change the period of the timer. 
-		if(apds_local_data.apds_cls_data.clear == 0){
-			producer_timer_period = 2;
-			consumer_timer_period=4;
-			k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
-			k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
-		}
-		curr_timestamp = k_uptime_get_32();
-		
-		prev_timestamp = curr_timestamp;
 		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
 		printk("APDS Ended!!!\n");
@@ -247,7 +237,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 			}
 			time = k_cycle_get_32();
 			if(consumer_local_data.type == SENSOR_APDS9960){
-				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Prox: %d\t Clear: %d\t Red: %d\t Blue: %d\t Green: %d\n",
+				printk("[Current: %d\t Period: %f] Data type: %s\t Prox: %d\t Clear: %d\t Red: %d\t Blue: %d\t Green: %d\n",
 													time,
 													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
@@ -262,7 +252,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 #endif
 			}
 			else if(consumer_local_data.type == SENSOR_SHT31){
-				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Temp: %f\t Humi: %f\n",
+				printk("[Current: %d\t Period: %f] Data type: %s\t Temp: %f\t Humi: %f\n",
 													time, 
 													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
@@ -279,7 +269,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 			}
 
 			else if(consumer_local_data.type == SENSOR_BMP280){
-				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t Temp: %f\t Press: %f\n",
+				printk("[Current: %d\t Period: %f] Data type: %s\t Temp: %f\t Press: %f\n",
 													time, 
 													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
@@ -297,7 +287,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 			}
 
 			else if(consumer_local_data.type == SENSOR_LSM6DS33){
-				printk("[Current: %d\t Data_time_stamp: %f] Data type: %s\t AccelX: %f\t AccelY: %f\t AccelZ: %f\n",
+				printk("[Current: %d\t Period: %f] Data type: %s\t AccelX: %f\t AccelY: %f\t AccelZ: %f\n",
 													time, 
 													consumer_local_data.period,
 													enum_to_string(&consumer_local_data),
@@ -415,7 +405,7 @@ void main(void)
 	k_thread_create(&apds9960_thread_data, apds9960_stack_area, 
 			K_THREAD_STACK_SIZEOF(apds9960_stack_area),
 			apds9960, NULL, NULL, NULL, 
-			PRIORITY, 0, K_MSEC(20));
+			PRIORITY-4, 0, K_MSEC(20));
 	k_thread_name_set(&apds9960_thread_data, "APDS Thread");
 #endif
 
