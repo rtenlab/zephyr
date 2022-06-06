@@ -212,9 +212,9 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	// Turn off the LED to notify we are connected!
 	led_on_blink1(false);
 	// Stop advertising once we are connected.
-	if(bt_le_adv_stop() != 0){
-		printk("Couldn't stop advertising. Sorry\n");
-	}
+	// if(bt_le_adv_stop() != 0){
+	// 	printk("Couldn't stop advertising. Sorry\n");
+	// }
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
