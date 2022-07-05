@@ -18,8 +18,14 @@
 
 volatile uint8_t stable_temperature = 0;
 volatile bool is_period_changed = false;
-volatile uint8_t producer_timer_period = 4;
-volatile uint8_t consumer_timer_period = 6;
+// Data Acquisition period will be 20 mins under normal conditions.
+volatile uint8_t normal_producer_timer_period = (1*60);
+// Data Sending period will be 20 mins under normal conditions.
+volatile uint8_t normal_consumer_timer_period = (1*60);
+// Data Acquisition period will be 1sec if abnormal temperatures are detected.
+volatile uint8_t abnormal_producer_timer_period = (0.5*60);
+// Data Sending period will also be 1 mins if abnormal temperatures are detected.
+volatile uint8_t abnormal_consumer_timer_period = (0.5*60);
 
 
 /*
@@ -38,9 +44,33 @@ volatile uint8_t consumer_timer_period = 6;
 /* scheduling priority used by each thread */
 #define PRIORITY 7
 
+bool abnormal_temperature_detected = false;
 struct k_mutex mymutex, tempvalue;
 
 #ifdef SHT31
+/**
+ * @brief check the temperature value of the current data acquitision of sht31. If the value is above certain limit, raise a flag. 
+ * 
+ * @param sht31tempPtr 
+ * @return true 
+ * @return false 
+ */
+static inline void sht31_check_temperature(sht31_t* sht31tempPtr){
+	if(sht31tempPtr->temp >=SWARMING_TEMP_THRESHOLD){
+		/**
+		 * @brief abnormal temp. detected. 
+		 * TODO: raise the flag and change the period.
+		 */
+		// making sure that the abnormal temperature flag is clear before setting it. 
+		if(!abnormal_temperature_detected){
+			abnormal_temperature_detected=true;
+			//change the period.
+			k_timer_start(&producer_timer, K_SECONDS(abnormal_producer_timer_period), K_SECONDS(abnormal_producer_timer_period));
+			k_timer_start(&consumer_timer, K_SECONDS(abnormal_consumer_timer_period), K_SECONDS(abnormal_consumer_timer_period));
+		}// end inner if.		
+	}// end outer if.
+}// end function.
+
 
 void sht31(void *dummy1, void *dummy2, void *dummy3)
 {
@@ -53,22 +83,49 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	ble_data_t sht31_local_data;
 	sht31_local_data.type = SENSOR_SHT31;
 	static uint32_t prev_timestamp, curr_timestamp;
+	static uint8_t called_counter=0;
 	while(1){
+		//Data acquisition start.
 		k_mutex_lock(&mymutex, K_FOREVER);
 		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		read_temp_hum(&sht31_local_data.sht31_data);
-		// sht31_local_data.period = k_cycle_get_32();
 		curr_timestamp = k_uptime_get_32();
 		prev_timestamp=curr_timestamp;
 		printk("[%f] Hello from %s\n", sht31_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &sht31_local_data, K_FOREVER);
-		if(sht31_local_data.sht31_data.temp >= SWARMING_TEMP_THRESHOLD){
-			k_mutex_lock(&tempvalue, K_FOREVER);
-			stable_temperature |= (1<<SHT31_POS);
-			k_mutex_unlock(&tempvalue);
-		}
-		printk("SHT Ended!!!\n");
 		k_mutex_unlock(&mymutex);
+		//Data Acquisition end.
+
+
+		// Abnormal activity check start.
+		if(abnormal_temperature_detected==true){
+			if(++called_counter >= 60){
+				// if sht is called for 60 times since the abnormal activity detected, clear the abnormal activity flag and counter value to 0;
+				called_counter = 0;
+				abnormal_temperature_detected=false;
+
+				// changing the period to normal temperature.
+				k_timer_start(&producer_timer, K_SECONDS(normal_producer_timer_period), K_SECONDS(normal_producer_timer_period));
+				k_timer_start(&consumer_timer, K_SECONDS(normal_consumer_timer_period), K_SECONDS(normal_consumer_timer_period));
+			}
+			else{
+				// Nothing to do. Wait until the counter reaches value 60.
+				continue;
+			}// end of else
+		}// end if
+
+		// if abnormal activity is not measured in last 60 mins.
+		else{
+			// Que: check if putting in the queue destroy this memory or it just copies the data to the queue.
+			// Ans: Data is copied and won't be changed by the msq_put.
+			sht31_check_temperature(&sht31_local_data.sht31_data);
+			printf("TEST: This should always be called with counter: %d\n", called_counter);
+
+			// period will be changed to 1 minute in the above function call if current sht temperature is abnormal.
+		}
+		// abnormal activity check end.
+		printk("SHT Ended!!!\n");
+		
 		k_sleep(K_FOREVER);
 	}
 	return;
@@ -129,14 +186,7 @@ void apds9960(void *dummy1, void *dummy2, void *dummy3)
 		read_proximity_data(&apds_local_data.apds_cls_data);
 		read_als_data(&apds_local_data.apds_cls_data);
 		// This is how it will change the period of the timer. 
-		if(apds_local_data.apds_cls_data.clear == 0){
-			producer_timer_period = 2;
-			consumer_timer_period=4;
-			k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
-			k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
-		}
-		curr_timestamp = k_uptime_get_32();
-		
+		curr_timestamp = k_uptime_get_32();		
 		prev_timestamp = curr_timestamp;
 		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
@@ -325,59 +375,14 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 }
 
 
-void temperature_checker_thread(void* dummy1, void* dummy2, void* dummy3){
-	ARG_UNUSED(dummy1);
-	ARG_UNUSED(dummy2);
-	ARG_UNUSED(dummy3);
-	bool is_period_changed = false;
-	uint8_t mins_since_counter_changed=0;
-	while(1){
-		// Period is not changed in last 60 minutes. Check if we are before swarming effect.
-		if(is_period_changed == false){
-			// Lock the mutex to read the stable_temperature value. Many threads might be 
-			// changing this at the same time.
-			k_mutex_lock(&tempvalue, K_FOREVER);
-			if((stable_temperature == 7) || (stable_temperature == 11) || 
-				(stable_temperature == 13) || (stable_temperature == 14) ||
-				(stable_temperature == 15)){
-					k_mutex_unlock(&tempvalue);
-					// Change the following values according to the needs. 
-					// This will start a new timer with new producer and consumer period values.
-					producer_timer_period = 2;
-					consumer_timer_period = 4;
-					k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
-				#ifdef CONSUMER
-					k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
-				#endif
-					is_period_changed=true;
-					mins_since_counter_changed=0;
-			}
-		}
-		// The period for both the threads was changed and hence we should count the number 
-		// of times the data was taken before we change the is_period_changed to false.
-		else{
-			// Considering that the period was set to every minute, we should get the data
-			// for 60 minutes (hence once we have a trigger, we will take data every minute
-			// for 60 minutes).
-			mins_since_counter_changed++;
-			if(mins_since_counter_changed >=60){
-				is_period_changed=false;
-				// Change the values to what the period values previously where. This variable is not needed.
-				producer_timer_period = 4;
-				consumer_timer_period = 6;
-				// Start the timers again, basically will change the period for both the timers.
-				k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
-			#ifdef CONSUMER
-				k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
-			#endif
-			}
-			
-		}
-		// Wait until one of the threads wake you up.
-		k_sleep(K_FOREVER);
-	}
+// void temperature_checker_thread(void* dummy1, void* dummy2, void* dummy3){
+// 	ARG_UNUSED(dummy1);
+// 	ARG_UNUSED(dummy2);
+// 	ARG_UNUSED(dummy3);
+// 	bool is_period_changed = false;
+// 	uint8_t mins_since_counter_changed=0;
 
-}
+// }
 
 
 
@@ -444,14 +449,14 @@ void main(void)
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
 #endif 
 
-	k_thread_create(&temperature_checker_thread_data, temperature_checker_stack_area,
-		K_THREAD_STACK_SIZEOF(temperature_checker_stack_area),
-		temperature_checker_thread, NULL, NULL, NULL,
-		PRIORITY, 0, K_MSEC(100));
-		k_thread_name_set(&temperature_checker_thread_data, "Temperature_Checker_Thread");
-	k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
+	// k_thread_create(&temperature_checker_thread_data, temperature_checker_stack_area,
+	// 	K_THREAD_STACK_SIZEOF(temperature_checker_stack_area),
+	// 	temperature_checker_thread, NULL, NULL, NULL,
+	// 	PRIORITY, 0, K_MSEC(100));
+		// k_thread_name_set(&temperature_checker_thread_data, "Temperature_Checker_Thread");
+	k_timer_start(&producer_timer, K_SECONDS(normal_producer_timer_period), K_SECONDS(normal_producer_timer_period));
 #ifdef CONSUMER
-	k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));
+	k_timer_start(&consumer_timer, K_SECONDS(normal_consumer_timer_period), K_SECONDS(normal_consumer_timer_period));
 #endif
 
 
