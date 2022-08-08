@@ -9,7 +9,7 @@
 
 // THREAD DEFINES
 #define SHT31
-// #define UART
+#define UART
 // #define LSM6DS33
 #define APDS9960
 #define SCD41
@@ -24,7 +24,7 @@
 #define BMP280_POS 2
 #define DS18B20_POS 3
 
-#define SWARMING_TEMP_THRESHOLD 40
+#define SWARMING_TEMP_THRESHOLD 20
 
 
 

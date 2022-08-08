@@ -23,9 +23,9 @@ volatile uint8_t normal_producer_timer_period = (1*60);
 // Data Sending period will be 20 mins under normal conditions.
 volatile uint8_t normal_consumer_timer_period = (1*60);
 // Data Acquisition period will be 1sec if abnormal temperatures are detected.
-volatile uint8_t abnormal_producer_timer_period = (0.5*60);
+volatile uint8_t abnormal_producer_timer_period = (0.1*60);
 // Data Sending period will also be 1 mins if abnormal temperatures are detected.
-volatile uint8_t abnormal_consumer_timer_period = (0.5*60);
+volatile uint8_t abnormal_consumer_timer_period = (0.1*60);
 
 
 /*
@@ -87,12 +87,13 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 	while(1){
 		//Data acquisition start.
 		k_mutex_lock(&mymutex, K_FOREVER);
+		curr_timestamp = k_uptime_get_32();
 		sht31_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		read_temp_hum(&sht31_local_data.sht31_data);
-		curr_timestamp = k_uptime_get_32();
 		prev_timestamp=curr_timestamp;
 		printk("[%f] Hello from %s\n", sht31_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &sht31_local_data, K_FOREVER);
+		printk("Done putting the sht data in the message queue\n");
 		k_mutex_unlock(&mymutex);
 		//Data Acquisition end.
 
@@ -110,7 +111,7 @@ void sht31(void *dummy1, void *dummy2, void *dummy3)
 			}
 			else{
 				// Nothing to do. Wait until the counter reaches value 60.
-				continue;
+				printk("abnormal_temperature_flag: [%d]; counter: [%d]\n", abnormal_temperature_detected, called_counter);
 			}// end of else
 		}// end if
 
@@ -146,10 +147,10 @@ void bmp280(void* dummy1, void* dummy2, void* dummy3){
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
+		curr_timestamp=k_uptime_get_32();
 		bmp280_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		bmp_read_press_temp_data(&bmp280_local_data.bmp280_data);
 		// bmp280_local_data.period = k_cycle_get_32()
-		curr_timestamp=k_uptime_get_32();
 		prev_timestamp = curr_timestamp;
 		printk("[%f] Hello from %s\n", bmp280_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &bmp280_local_data, K_FOREVER);
@@ -182,11 +183,11 @@ void apds9960(void *dummy1, void *dummy2, void *dummy3)
 	static uint32_t prev_timestamp, curr_timestamp;
 	while(1){
 		k_mutex_lock(&mymutex, K_FOREVER);
+		curr_timestamp = k_uptime_get_32();		
 		apds_local_data.period = (curr_timestamp-prev_timestamp)/1000.00;
 		read_proximity_data(&apds_local_data.apds_cls_data);
 		read_als_data(&apds_local_data.apds_cls_data);
 		// This is how it will change the period of the timer. 
-		curr_timestamp = k_uptime_get_32();		
 		prev_timestamp = curr_timestamp;
 		printk("[%f] Hello from %s\n", apds_local_data.period,k_thread_name_get(current_thread));
 		k_msgq_put(&my_msgq, &apds_local_data, K_FOREVER);
