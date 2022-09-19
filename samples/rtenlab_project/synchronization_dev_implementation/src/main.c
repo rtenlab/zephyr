@@ -19,7 +19,7 @@
 volatile uint8_t stable_temperature = 0;
 volatile bool is_period_changed = false;
 volatile uint8_t producer_timer_period = 4;
-volatile uint8_t consumer_timer_period = 6;
+volatile uint8_t consumer_timer_period = 21;
 
 
 /*
@@ -229,6 +229,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 	uint32_t time=0;
 	printk("Consumer Thread: Entered for the first time!!!\n");
 	while(1){
+		led_on_blink1(true);
 		uint8_t num_used = k_msgq_num_used_get(&my_msgq);
 		for(int i=0; i<num_used; i++){
 			int8_t ret = k_msgq_get(&my_msgq, &consumer_local_data, K_MSEC(100));
@@ -252,18 +253,18 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 #endif
 			}
 			else if(consumer_local_data.type == SENSOR_SHT31){
-				printk("[Current: %d\t Period: %f] Data type: %s\t Temp: %f\t Humi: %f\n",
-													time, 
-													consumer_local_data.period,
-													enum_to_string(&consumer_local_data),
-														consumer_local_data.sht31_data.temp, 
-														consumer_local_data.sht31_data.humidity);
+				// printk("[Current: %d\t Period: %f] Data type: %s\t Temp: %f\t Humi: %f\n",
+													// time, 
+													// consumer_local_data.period,
+													// enum_to_string(&consumer_local_data),
+														// consumer_local_data.sht31_data.temp, 
+														// consumer_local_data.sht31_data.humidity);
 				int16_t temp_value, hum_value;
 				temp_value = (uint16_t)((consumer_local_data.sht31_data.temp)*100);
 				hum_value = (uint16_t)((consumer_local_data.sht31_data.humidity)*100);
 #ifdef BLE				
 				bt_gatt_notify(NULL, &ess_svc.attrs[SHT_TEMP_BLE_HANDLE], &temp_value, sizeof(temp_value));
-				delay(100);
+				// delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[SHT_HUM_BLE_HANDLE], &hum_value, sizeof(hum_value));
 #endif
 			}
@@ -281,7 +282,7 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				pressure = (uint32_t)((consumer_local_data.bmp280_data.pressure)*10);
 #ifdef BLE
 				bt_gatt_notify(NULL, &ess_svc.attrs[BMP_TEMP_BLE_HANDLE], &temperature, sizeof(temperature));
-				delay(100);
+				// delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[BMP_PRESS_BLE_HANDLE], &pressure, sizeof(pressure));
 #endif 
 			}
@@ -300,14 +301,15 @@ void consumer_thread(void* dummy1, void* dummy2, void* dummy3)
 				finalZ = (int16_t)((consumer_local_data.lsm6ds33_data.accelZ)*100+32768);
 #ifdef BLE
 				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELX_BLE_HANDLE], &finalX, sizeof(finalX));
-				delay(100);
+				// delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELY_BLE_HANDLE], &finalY, sizeof(finalY));
-				delay(100);
+				// delay(100);
 				bt_gatt_notify(NULL, &ess_svc.attrs[LSM_ACCELZ_BLE_HANDLE], &finalZ, sizeof(finalZ));
 #endif
 			}
 			
 		}// End of if.
+		led_on_blink1(false);
 		k_sleep(K_FOREVER);
 
 	}
@@ -434,11 +436,13 @@ void main(void)
 	k_thread_name_set(&consumer_thread_data, "Consumer_Thread");
 #endif 
 
+#ifdef Temperature_check
 	k_thread_create(&temperature_checker_thread_data, temperature_checker_stack_area,
 		K_THREAD_STACK_SIZEOF(temperature_checker_stack_area),
 		temperature_checker_thread, NULL, NULL, NULL,
 		PRIORITY, 0, K_MSEC(100));
 		k_thread_name_set(&temperature_checker_thread_data, "Temperature_Checker_Thread");
+#endif
 	k_timer_start(&producer_timer, K_SECONDS(producer_timer_period), K_SECONDS(producer_timer_period));
 #ifdef CONSUMER
 	k_timer_start(&consumer_timer, K_SECONDS(consumer_timer_period), K_SECONDS(consumer_timer_period));

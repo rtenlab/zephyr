@@ -45,7 +45,7 @@
 #define BME680
 #define BLE
 #define BATTERY
-#define MAIN_DEBUG
+// #define MAIN_DEBUG
 
 // Defines to get the format of the data sent using custom characteristics UUID
 #define CPF_FORMAT_UINT8 	0x04

@@ -47,7 +47,7 @@ uint16_t read_status(void){
 void read_temp_hum(sht31_t *var){
 	uint8_t read_buffer[6];
 	write_command(HIGH_MEAS_CLOCK_ENABLE);
-	k_sleep(K_MSEC(50));
+	k_sleep(K_MSEC(20));
 	int ret = i2c_read(dev_i2c, &read_buffer[0], 6, SHT31_ADDR);
 	if(ret){
 		printk("ret:%d \n",ret);

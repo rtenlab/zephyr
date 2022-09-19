@@ -34,10 +34,10 @@
 			gpios = <&gpio1 10 0>;
 			label = "Blue LED";
 		};
-		// led2: led_2 {
-		// 	gpios = <&gpio0 7 0>;
-		// 	label = "Custom LED";
-		// };
+		toggle0: toggle_0{
+			gpios = <&gpio0 27 0>;
+			label = "Toggle Pin";
+		};
 
 	};
 
@@ -74,8 +74,8 @@
 		led1 = &led1;
 		sw0 = &button0;
 		sw1 = &button1;
-		//led2 = &led2;
 		ds0 = &ds0;
+		toggle0 = &toggle0;
 	};
 };
 

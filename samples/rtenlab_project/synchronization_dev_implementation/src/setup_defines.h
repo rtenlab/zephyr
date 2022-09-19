@@ -8,12 +8,14 @@
 #include "bmp280.h"
 
 // THREAD DEFINES
-// #define SHT31
+#define SHT31
 // #define UART
 // #define LSM6DS33
-#define APDS9960
+// #define APDS9960
 // #define SCD41
 // #define BMP280
+// #define DS18B20
+// #define BME680
 #define BLE
 #define CONSUMER
 /* size of stack area used by each thread */
@@ -32,6 +34,7 @@
 K_THREAD_STACK_DEFINE(sht31_stack_area, STACKSIZE);
 static struct k_thread sht31_thread_data;
 #endif
+
 #ifdef APDS9960
 K_THREAD_STACK_DEFINE(apds9960_stack_area, STACKSIZE);
 static struct k_thread apds9960_thread_data;

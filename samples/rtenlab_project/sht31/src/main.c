@@ -18,7 +18,7 @@
 
 void main(void){
 	sht31_t variable;
-	// enable_uart_console();
+	enable_uart_console();
 	configure_device();
 	while(true){
 		read_temp_hum(&variable);

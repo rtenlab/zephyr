@@ -42,6 +42,24 @@
 #define FLAGS	0
 #endif
 
+
+/* The devicetree node identifier for the "led0" alias. */
+#define TOGGLE_NODE DT_ALIAS(toggle0)
+
+#if DT_NODE_HAS_STATUS(TOGGLE_NODE, okay)
+#define TOGGLE	DT_GPIO_LABEL(TOGGLE_NODE, gpios)
+#define TOGGLE_PIN	DT_GPIO_PIN(TOGGLE_NODE, gpios)
+#define TOGGLE_FLAGS	DT_GPIO_FLAGS(TOGGLE_NODE, gpios)
+#else
+/* A build error here means your board isn't set up to blink an LED. */
+#error "Unsupported board: led0 devicetree alias is not defined"
+#define TOGGLE	""
+#define TOGGLE_PIN	0
+#define TOGGLE_FLAGS	0
+#endif
+
+
+
 void led_on_blink0(bool flag)
 {
 	const struct device *dev;
@@ -58,7 +76,6 @@ void led_on_blink0(bool flag)
 	}
 
 	gpio_pin_set(dev, PIN, (int)flag);
-	k_busy_wait(10000);
 }
 
 
@@ -78,5 +95,22 @@ void led_on_blink1(bool flag)
 	}
 
 	gpio_pin_set(dev, LED1_PIN, (int)flag);
-	k_busy_wait(10000);
+}
+
+void toggle_pin_D9(bool flag)
+{
+	const struct device *dev;
+	int ret;
+
+	dev = device_get_binding(TOGGLE);
+	if (dev == NULL) {
+		return;
+	}
+
+	ret = gpio_pin_configure(dev, TOGGLE_PIN, GPIO_OUTPUT_ACTIVE | TOGGLE_FLAGS);
+	if (ret < 0) {
+		return;
+	}
+
+	gpio_pin_set(dev, TOGGLE_PIN, (int)flag);
 }
