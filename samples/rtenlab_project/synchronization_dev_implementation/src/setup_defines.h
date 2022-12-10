@@ -11,9 +11,9 @@
 #define SHT31
 #define UART
 // #define LSM6DS33
-#define APDS9960
-#define SCD41
-#define BMP280
+// #define APDS9960
+// #define SCD41
+// #define BMP280
 #define BLE
 #define CONSUMER
 /* size of stack area used by each thread */
@@ -106,7 +106,6 @@ K_MSGQ_DEFINE(my_msgq, sizeof(ble_data_t), MSGQ_LENGTH, MSGQ_BYTE_BOUNDARY);
  * @retval None
  */
 void producer_work_handler(struct k_work *work){
-	printk("Timer fired!!!\n");
 #ifdef SHT31
 	k_wakeup(&sht31_thread_data);
 #endif
@@ -122,7 +121,6 @@ void producer_work_handler(struct k_work *work){
 }
 
 void consumer_work_handler(struct k_work * work){
-	printk("Consumer timer Fired!!!\n");
 	k_wakeup(&consumer_thread_data);
 }
 // Define a work and it's work handler
